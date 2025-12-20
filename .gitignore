@@ -1,0 +1,18 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environnement virtuel
+venv/
+ENV/
+env/
+
+# IDE / système
+.vscode/
+.idea/
+.DS_Store
+
+# Logs et fichiers temporaires
+*.log
+*.tmp
