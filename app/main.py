@@ -15,7 +15,7 @@ get_db = connexion_db.get_db
 # Endpoint test
 @app.get("/")
 def read_root():
-    return {"message": "API fonctionne!"}
+    return {"message": "hello issam your API is work good!"}
 
 # Endpoint pour créer un utilisateur
 @app.post("/register", response_model=schemas.UserOut)
