@@ -1,0 +1,38 @@
+pour activer venv
+
+venv\Scripts\Activate
+
+
+pour verifie que docker fonctionne bien
+1) lancer docker desktop
+2) docker run hello-world
+
+
+
+apres pour installer les libraires just
+
+docker compose up --build
+
+
+pour lancer fast api
+
+uvicorn app.main:app --reload
+
+
+
+
+
+
+
+
+
+user deja sur base de donnne
+
+{
+    "nom": "Issam",
+    "prenom": "Adoch",
+    "adress": "Beni Mellal",
+    "email": "issam@gmail.com",
+    "mot_de_passe": "issam1234",
+    "role": "user"
+}

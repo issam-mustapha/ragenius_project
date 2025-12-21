@@ -1,9 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException ,UploadFile, File
 from sqlalchemy.orm import Session
 from app import connexion_db
 from auth import auth, models, schemas
 from auth.schemas import UserLogin, Token
 from fastapi import HTTPException
+from auth.models import PdfDocument, User
+import os
+from auth.dependencies import get_current_user
 # Crée la DB si pas déjà
 models.Base.metadata.create_all(bind=connexion_db.engine)
 
@@ -71,3 +74,26 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         print("Erreur lors de la connexion :", e)
         raise HTTPException(status_code=500, detail="Erreur interne lors de la connexion")
 
+@app.post("/upload-pdf")
+def upload_pdf(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),  # ✅ ici
+    db: Session = Depends(get_db)
+):
+    user_dir = f"storage/users/user_{current_user.id}/pdfs"
+    os.makedirs(user_dir, exist_ok=True)
+
+    file_path = os.path.join(user_dir, file.filename)
+
+    with open(file_path, "wb") as f:
+        f.write(file.file.read())
+
+    pdf = PdfDocument(
+        filename=file.filename,
+        filepath=file_path,
+        user_id=current_user.id
+    )
+    db.add(pdf)
+    db.commit()
+
+    return {"message": "PDF uploadé avec succès"}
