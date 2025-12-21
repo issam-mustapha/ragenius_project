@@ -1,13 +1,17 @@
-from fastapi import FastAPI, Depends, HTTPException ,UploadFile, File
+import os
+from fastapi import FastAPI, Depends, HTTPException ,UploadFile, File ,Body
 from sqlalchemy.orm import Session
 from app import connexion_db
 from auth import auth, models, schemas
 from auth.schemas import UserLogin, Token
 from fastapi import HTTPException
 from auth.models import PdfDocument, User
-import os
+from pydantic import BaseModel
 from auth.dependencies import get_current_user
 from app.rag.create_embedding import create_user_embeddings
+from app.rag.get_document_reterived import retrieve_user_documents
+
+
 # Crée la DB si pas déjà
 models.Base.metadata.create_all(bind=connexion_db.engine)
 
@@ -16,6 +20,9 @@ app = FastAPI()
 # Dependency
 get_db = connexion_db.get_db
 
+#to recieve query payload
+class QueryRequest(BaseModel):
+    query: str
 # Endpoint test
 @app.get("/")
 def read_root():
@@ -98,3 +105,34 @@ def upload_pdf(
     db.commit()
     create_user_embeddings(current_user.id)
     return {"message": "PDF uploadé avec succès"}
+
+@app.post("/query")
+def query_documents(
+    payload: QueryRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Endpoint pour que l'utilisateur récupère les documents pertinents
+    Payload attendu: {"query": "ma question ici"}
+    """
+    query_text = payload.query
+
+    if not query_text:
+        raise HTTPException(status_code=400, detail="Query manquante")
+
+    # Récupération des documents pertinents
+    docs = retrieve_user_documents(current_user.id, query_text)
+
+    if not docs:
+        return {"message": "Aucun document pertinent trouvé", "results": []}
+
+    # Formater la réponse
+    results = []
+    for doc, score in docs:
+        results.append({
+            "content": doc.page_content,
+            "metadata": doc.metadata,
+            "similarity_score": score
+        })
+
+    return {"results": results}
