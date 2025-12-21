@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from auth.models import PdfDocument, User
 import os
 from auth.dependencies import get_current_user
+from app.rag.create_embedding import create_user_embeddings
 # Crée la DB si pas déjà
 models.Base.metadata.create_all(bind=connexion_db.engine)
 
@@ -95,5 +96,5 @@ def upload_pdf(
     )
     db.add(pdf)
     db.commit()
-
+    create_user_embeddings(current_user.id)
     return {"message": "PDF uploadé avec succès"}

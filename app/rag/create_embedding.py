@@ -4,78 +4,70 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_ollama import OllamaEmbeddings
 
-# ===============================
-# CONFIG (OPTIMISÉE)
-# ===============================
-MODEL_NAME ="nomic-embed-text"   # 🔥 meilleur que nomic ici
-CHUNK_SIZE = 120                   # 🔥 idéal pour définitions
-CHUNK_OVERLAP = 30
-TOP_K = 5
-FETCH_K = 20                       # pour MMR
+MODEL_NAME = "nomic-embed-text"
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 200
 
-# ===============================
-# PATHS
-# ===============================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BOOKS_DIR = os.path.join(BASE_DIR, "books")
-DB_DIR = os.path.join(BASE_DIR, "db", "chroma_db")
+def create_user_embeddings(user_id: int):
+    user_pdf_dir = f"storage/users/user_{user_id}/pdfs"
+    user_db_dir = f"storage/users/user_{user_id}/vectordb"
 
-os.makedirs(DB_DIR, exist_ok=True)
+    os.makedirs(user_db_dir, exist_ok=True)
 
-# ===============================
-# LOAD & CLEAN PDF
-# ===============================
-print("📄 Loading PDF files...")
+    # Charger DB existante si elle existe
+    embeddings = OllamaEmbeddings(model=MODEL_NAME)
+    db = Chroma(persist_directory=user_db_dir, embedding_function=embeddings)
 
-documents = []
+    # Lister tous les PDFs uploadés
+    pdf_files = [f for f in os.listdir(user_pdf_dir) if f.endswith(".pdf")]
+    if not pdf_files:
+        print(f"⚠️ User {user_id} has no PDFs")
+        return None
 
-pdf_files = [f for f in os.listdir(BOOKS_DIR) if f.endswith(".pdf")]
-if not pdf_files:
-    raise RuntimeError("❌ No PDF files found in books/")
+    # Récupérer les PDFs déjà présents dans la vectordb
+    existing_sources = set()
+    if db._collection:
+        # db._collection.get()["metadatas"] contient les sources
+        metadatas = db._collection.get()["metadatas"]
+        for meta in metadatas:
+            if "source" in meta and meta["source"]:
+                existing_sources.add(meta["source"])
 
-for pdf in pdf_files:
-    loader = PyPDFLoader(os.path.join(BOOKS_DIR, pdf))
-    pages = loader.load()
+    print(f"les pdfs de cet user est {existing_sources}")
+    # Filtrer les PDF qui n'ont pas encore été traités
+    new_pdfs = [pdf for pdf in pdf_files if pdf not in existing_sources]
+    if not new_pdfs:
+        print(f"✅ No new PDFs to process for user {user_id}")
+        return db
+    print(f"my new pdf is {new_pdfs}")
+    documents = []
+    for pdf in new_pdfs:
+        loader = PyPDFLoader(os.path.join(user_pdf_dir, pdf))
+        pages = loader.load()
 
-    for page in pages:
-        clean_text = (
-            page.page_content
-            .replace("\n", " ")
-            .replace("  ", " ")
-            .strip()
-        )
+        for page in pages:
+            text = page.page_content.replace("\n", " ").strip()
+            page.page_content = f"This section explains the following concept:\n{text}"
+            page.metadata["source"] = pdf
+            documents.append(page)
 
-        # 🔥 enrichissement sémantique léger
-        page.page_content = f"This section explains the following concept:\n{clean_text}"
-        page.metadata["source"] = pdf
+    print(f"📄 Loaded {len(documents)} pages from {len(new_pdfs)} new PDFs")
 
-        documents.append(page)
+    # Split en chunks
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+        add_start_index=True
+    )
+    chunks = text_splitter.split_documents(documents)
+    print(f"✂️ Created {len(chunks)} chunks for new PDFs")
 
-print(f"✅ Loaded {len(documents)} pages")
+    # Ajouter seulement les nouveaux chunks
+    batch_size = 50
+    for i in range(0, len(chunks), batch_size):
+        db.add_documents(chunks[i:i+batch_size])
+        print(f"🧠 Added {i+len(chunks[i:i+batch_size])}/{len(chunks)} chunks")
 
-# ===============================
-# SPLIT DOCUMENTS (IMPORTANT)
-# ===============================
-print("✂️ Splitting documents...")
-
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000, chunk_overlap=200, add_start_index=True
-)
-
-chunks = text_splitter.split_documents(documents)
-print(f"✅ Created {len(chunks)} chunks")
-
-# ===============================
-# VECTOR STORE
-# ===============================
-print("🧠 Creating vector store...")
-
-embeddings = OllamaEmbeddings(model=MODEL_NAME)
-
-db = Chroma.from_documents(
-    documents=chunks,
-    embedding=embeddings,
-    persist_directory=DB_DIR
-)
-
-print("✅ Vector store ready")
+    db.persist()
+    print(f"✅ Vector store updated for user {user_id}")
+    return db
