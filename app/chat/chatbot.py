@@ -6,6 +6,7 @@ from langchain.agents import create_agent, AgentState
 from langchain.agents.middleware import dynamic_prompt, ModelRequest, before_model, after_model
 from langgraph.runtime import Runtime
 from langchain.messages import HumanMessage
+from langchain.tools import tool, ToolRuntime
 
 # Remonte jusqu'au dossier "projet 3 docker"
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -75,9 +76,21 @@ def log_after_model(state: AgentState, runtime: Runtime[Context]) -> dict | None
 # =========================
 # Création de l'agent RAG pro
 # =========================
+
+@tool
+def fetch_user_email_preferences(runtime: ToolRuntime[Context]) -> str:  
+    """Fetch the user's email preferences from the store."""
+    user_id = runtime.context.user_id  
+    preferences: str = "The user prefers details in response."
+    if runtime.store:  
+        if memory := runtime.store.get(("users",), user_id):  
+            preferences = memory.value["preferences"]
+
+    return preferences
+
 agent = create_agent(
     model=model,
-    tools=[],  # Ajouter des outils plus tard si nécessaire
+    tools=[fetch_user_email_preferences],  # Ajouter des outils plus tard si nécessaire
     middleware=[dynamic_system_prompt, log_before_model, log_after_model],
     context_schema=Context
 )
