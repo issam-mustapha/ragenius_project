@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from auth.dependencies import get_current_user
 from app.rag.create_embedding import create_user_embeddings
 from app.rag.get_document_reterived import retrieve_user_documents
-
+from app.chat.chatbot import chat_with_rag
 
 # Crée la DB si pas déjà
 models.Base.metadata.create_all(bind=connexion_db.engine)
@@ -136,3 +136,20 @@ def query_documents(
         })
 
     return {"results": results}
+
+@app.post("/chat")
+def chat(
+    payload: QueryRequest,
+    current_user: User = Depends(get_current_user)
+):
+    query_text = payload.query.strip()
+
+    if not query_text:
+        raise HTTPException(status_code=400, detail="Query manquante")
+
+    answer = chat_with_rag(
+        user_id=current_user.id,
+        query=query_text
+    )
+
+    return {"answer": answer}

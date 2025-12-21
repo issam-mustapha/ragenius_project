@@ -29,4 +29,5 @@ def retrieve_user_documents(user_id: int, query: str, k: int = 5, min_score: flo
 
     # Filtrer selon le score
     filtered = [(doc, score) for doc, score in results if score >= min_score]
+    
     return filtered
