@@ -50,28 +50,55 @@ def dynamic_system_prompt(request: ModelRequest) -> str:
 
     user_messages = [m for m in request.messages if m.type == "human"]
     question = user_messages[-1].content if user_messages else ""
+    print(f"the question is {question}")
+    # 🧠 Mémoire courte (conversation)
+    conversation_history = "\n".join(
+        [f"{m.type.upper()}: {m.content}" for m in request.messages[-10:]]
+    )
 
+    # 📚 Documents pertinents
     docs_with_scores = retrieve_user_documents(user_id, question)
-    rag_prompt = ""
+
+    documents_context = ""
     if docs_with_scores:
-        context_text = "\n\n".join([doc.page_content for doc, score in docs_with_scores])
-        print(f"the context text {context_text}")
-        rag_prompt = f"""
-You should use the following documents:
-{context_text}
-"""
+        documents_context = "\n\n".join(
+            [doc.page_content for doc, score in docs_with_scores]
+        )
+        print(f"les documents de contexts sont {documents_context}")
+      
     system_prompt = f"""
-You are a professional conversational assistant.
+You are a highly intelligent RAG conversational assistant.
 
-Rules:
-- You can use conversation memory to answer questions.
-- Use documents if the answer is not in conversation memory .
-- If the user shared personal information earlier (like their name), remember it.
-- Do NOT say "I don't have information" if the answer is in the conversation history.
+You have access to TWO types of context:
 
-{rag_prompt}
+### 1️⃣ Conversation Memory (short-term)
+Use this to:
+- Remember what the user said earlier
+- Maintain continuity
+- Personalize responses
+
+Conversation history:
+{conversation_history}
+
+### 2️⃣ Retrieved Documents (knowledge base)
+Use this to:
+- Answer factual or technical questions
+- Provide precise information
+
+Documents:
+{documents_context if documents_context else "No relevant documents found."}
+
+### Rules:
+- ALWAYS consider both contexts before answering.
+- If documents contain the answer → prioritize them.
+- If documents are partial → enrich using conversation memory.
+- If documents are empty → rely on conversation memory.
+- Never ignore previous user messages.
+- Respond clearly, professionally, and helpfully.
 """
+
     return system_prompt
+
 
 
 # =========================
@@ -101,11 +128,11 @@ def fetch_user_email_preferences(runtime: ToolRuntime[Context]) -> str:
             preferences = memory.value["preferences"]
 
     return preferences
-
+# 
 agent = create_agent(
     model=model,
     tools=[fetch_user_email_preferences],  # Ajouter des outils plus tard si nécessaire
-    middleware=[summarizer,dynamic_system_prompt, log_before_model, log_after_model],
+    middleware=[dynamic_system_prompt, summarizer, log_before_model, log_after_model],
     context_schema=Context,
     checkpointer=checkpointer   # ✅ mémoire activée
 )
@@ -138,3 +165,41 @@ def chat_with_agent(user_id: int, query: str) -> str:
 
     # fallback
     return ai_messages[-1].content if ai_messages else "No response."
+
+
+
+def main():
+    print("=" * 60)
+    print("🤖 RAG CHATBOT - MODE INTERACTIF (CLI)")
+    print("Tape 'exit' ou 'quit' pour quitter")
+    print("=" * 60)
+
+    # 🔐 Simuler un utilisateur connecté
+    user_id = 6
+
+    while True:
+        try:
+            user_input = input("\n🧑 User > ")
+
+            if user_input.lower() in {"exit", "quit"}:
+                print("\n👋 Fin de la conversation. À bientôt !")
+                break
+
+            # Appel à ton agent avec mémoire
+            response = chat_with_agent(
+                user_id=user_id,
+                query=user_input
+            )
+
+            print(f"\n🤖 Assistant > {response}")
+
+        except KeyboardInterrupt:
+            print("\n\n👋 Arrêt manuel (CTRL+C)")
+            break
+
+        except Exception as e:
+            print(f"\n❌ Erreur : {e}")
+
+
+if __name__ == "__main__":
+    main()
