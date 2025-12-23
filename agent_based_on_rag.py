@@ -3,18 +3,14 @@ import os
 from dataclasses import dataclass
 from langchain_ollama import ChatOllama
 from langchain.agents import create_agent, AgentState
-from langchain.agents.middleware import dynamic_prompt, ModelRequest, before_model, after_model, SummarizationMiddleware
+from langchain.agents.middleware import dynamic_prompt, ModelRequest, before_model, after_model
 from langgraph.runtime import Runtime
 from langchain.messages import HumanMessage
 from langchain.tools import tool, ToolRuntime
-from langgraph.checkpoint.memory import InMemorySaver
-from langchain_core.runnables import RunnableConfig
 
 # Remonte jusqu'au dossier "projet 3 docker"
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
 print("Dossier courant :", os.getcwd())
-
 from app.rag.get_document_reterived import retrieve_user_documents
 # =========================
 # Définition du modèle
@@ -23,9 +19,6 @@ model = ChatOllama(
     model="mistral",
     base_url="http://localhost:11434"
 )
-
-# Mémoire court terme (en RAM)
-checkpointer = InMemorySaver()
 
 # =========================
 # Contexte utilisateur simplifié
@@ -37,40 +30,33 @@ class Context:
 # =========================
 # Dynamic system prompt
 # =========================
-summarizer = SummarizationMiddleware(
-    model="mistral",        # ou mistral:latest si dispo
-    trigger=("tokens", 3000),  # résumer quand on dépasse
-    keep=("messages", 10)      # garder les 10 derniers messages
-)
-
 @dynamic_prompt
 def dynamic_system_prompt(request: ModelRequest) -> str:
     runtime: Runtime[Context] = request.runtime
     user_id = runtime.context.user_id
 
-    user_messages = [m for m in request.messages if m.type == "human"]
-    question = user_messages[-1].content if user_messages else ""
+    # Accéder correctement au contenu du message
+    if hasattr(request, "messages"):
+        # request.messages est une liste de HumanMessage / AIMessage
+        user_messages = [m for m in request.messages if m.type == "human"]
+        question = user_messages[-1].content if user_messages else ""
+    else:
+        question = ""
 
+    # Récupérer les documents pertinents
     docs_with_scores = retrieve_user_documents(user_id, question)
-    rag_prompt = ""
+
     if docs_with_scores:
         context_text = "\n\n".join([doc.page_content for doc, score in docs_with_scores])
-        print(f"the context text {context_text}")
-        rag_prompt = f"""
-You should use the following documents:
-{context_text}
-"""
+        rag_prompt = f"Use the following documents to answer the question:\n{context_text}\n"
+    else:
+        rag_prompt = "I don't have enough information in your documents to answer this question.\n"
+
     system_prompt = f"""
-You are a professional conversational assistant.
-
-Rules:
-- You can use conversation memory to answer questions.
-- Use documents if the answer is not in conversation memory .
-- If the user shared personal information earlier (like their name), remember it.
-- Do NOT say "I don't have information" if the answer is in the conversation history.
-
-{rag_prompt}
-"""
+    You are a professional assistant. Answer the user's question using the documents if available.
+    {rag_prompt}
+    Question: {question}
+    """
     return system_prompt
 
 
@@ -105,9 +91,8 @@ def fetch_user_email_preferences(runtime: ToolRuntime[Context]) -> str:
 agent = create_agent(
     model=model,
     tools=[fetch_user_email_preferences],  # Ajouter des outils plus tard si nécessaire
-    middleware=[summarizer,dynamic_system_prompt, log_before_model, log_after_model],
-    context_schema=Context,
-    checkpointer=checkpointer   # ✅ mémoire activée
+    middleware=[dynamic_system_prompt, log_before_model, log_after_model],
+    context_schema=Context
 )
 def chat_with_agent(user_id: int, query: str) -> str:
     """
@@ -122,19 +107,17 @@ def chat_with_agent(user_id: int, query: str) -> str:
 
     # Construire le message utilisateur pour l'agent
     messages = [HumanMessage(content=query)]
-    config: RunnableConfig = {
-        "configurable": {
-            "thread_id": f"user-{user_id}"  # 🧠 mémoire par utilisateur
-        }
-    }
+
     # Invoquer l'agent
     response = agent.invoke(
         {"messages": messages},
-        context=runtime_context,
-        config=config
+        context=runtime_context
     )
 
-    ai_messages = [m for m in response["messages"] if m.type == "ai"]
-
+  # Extraire uniquement le texte de l'AIMessage
+    if hasattr(response, "messages"):
+        ai_messages = [m for m in response.messages if m.type == "ai"]
+        if ai_messages:
+            return ai_messages[-1].content  # texte du dernier message AI
     # fallback
-    return ai_messages[-1].content if ai_messages else "No response."
+    return str(response)

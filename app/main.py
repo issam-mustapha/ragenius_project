@@ -12,6 +12,7 @@ from app.rag.create_embedding import create_user_embeddings
 from app.rag.get_document_reterived import retrieve_user_documents
 from app.chat.chatbot import chat_with_agent
 
+
 # Crée la DB si pas déjà
 models.Base.metadata.create_all(bind=connexion_db.engine)
 
@@ -146,6 +147,10 @@ def chat(
 
     if not query_text:
         raise HTTPException(status_code=400, detail="Query manquante")
+   
+
+    # Générer et stocker automatiquement les préférences de l'utilisateur
+    #initialize_user_preferences(current_user.id, db_session)
 
     answer = chat_with_agent(
         user_id=current_user.id,
