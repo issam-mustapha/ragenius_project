@@ -41,3 +41,27 @@ user deja sur base de donnne
 git add .
 git commit -m "Ton nouveau commit"
 git push origin main
+
+
+
+pour ajouter venv
+python -m venv venv
+
+
+pour installer les packages qui sont sur requirment.txt
+pip install -r requirements.txt
+
+
+
+pour github
+
+
+================================================
+echo "# course_langGraph" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/issam-mustapha/course_langGraph.git
+git push -u origin main
+=================================================================

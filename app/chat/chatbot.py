@@ -175,7 +175,7 @@ def main():
     print("=" * 60)
 
     # 🔐 Simuler un utilisateur connecté
-    user_id = 6
+    user_id = 1
 
     while True:
         try:

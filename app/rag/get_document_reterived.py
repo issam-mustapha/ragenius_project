@@ -1,5 +1,5 @@
 import os
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 import asyncio
 MODEL_NAME = "nomic-embed-text"

@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/projet_summurzing"
+DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/projete_agent_chatbot"
 #"postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable"
 
 engine = create_engine(DATABASE_URL)
