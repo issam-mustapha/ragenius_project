@@ -7,7 +7,7 @@ from pydantic import BaseModel, ValidationError
 from langgraph.graph import StateGraph, MessagesState, START
 from langgraph.store.postgres import PostgresStore
 from langchain_ollama import ChatOllama, OllamaEmbeddings
-
+from app.connexion_db import getUrl
 # -------------------------------
 # 1️⃣ Modèle & embeddings
 # -------------------------------
@@ -20,10 +20,11 @@ embeddings = OllamaEmbeddings(model=EMBED_MODEL_NAME)
 # -------------------------------
 # 2️⃣ PostgreSQL Store
 # -------------------------------
-DB_URI = "postgresql://postgres:postgres@localhost:5432/lg?sslmode=disable"
+DB_URI = getUrl()
 store_cm = PostgresStore.from_conn_string(DB_URI)
-store = store_cm.__enter__()
 
+store = store_cm.__enter__()
+#store.setup()
 store.index = {
     "embed": embeddings,
     "dims": 1536
@@ -185,7 +186,7 @@ graph = builder.compile(store=store)
 config = {
     "configurable": {
         "thread_id": "t1",
-        "user_id": "54"
+        "user_id": "1"
     }
 }
 
