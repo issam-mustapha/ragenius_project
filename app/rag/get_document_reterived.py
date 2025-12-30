@@ -1,7 +1,7 @@
 import os
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
-import asyncio
+
 MODEL_NAME = "nomic-embed-text"
 BASE_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..")

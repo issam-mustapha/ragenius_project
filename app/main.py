@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Depends, HTTPException ,UploadFile, File ,Body
+from fastapi import FastAPI, Depends, HTTPException ,UploadFile, File ,Body,Form
 from sqlalchemy.orm import Session
 from app import connexion_db
 from auth import auth, models, schemas
@@ -11,7 +11,14 @@ from auth.dependencies import get_current_user
 from app.rag.create_embedding import create_user_embeddings
 from app.rag.get_document_reterived import retrieve_user_documents
 from app.chat.chatbot import chat_with_agent
+from auth import auth
+import requests
+from jose import jwt
 
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI") 
 
 # Crée la DB si pas déjà
 models.Base.metadata.create_all(bind=connexion_db.engine)
@@ -82,6 +89,57 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         # Capture toutes les autres erreurs
         print("Erreur lors de la connexion :", e)
         raise HTTPException(status_code=500, detail="Erreur interne lors de la connexion")
+
+@app.post("/login/google", response_model=Token)
+def login_google(code: str = Form(...), db: Session = Depends(get_db)):
+    """
+    Recevoir le code d'autorisation Google, récupérer l'utilisateur et générer un JWT local.
+    """
+    try:
+        # 1️⃣ Échanger le code contre access_token et id_token
+        token_url = "https://oauth2.googleapis.com/token"
+        data = {
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": GOOGLE_REDIRECT_URI,
+            "grant_type": "authorization_code",
+        }
+        token_response = requests.post(token_url, data=data)
+        token_response.raise_for_status()
+        token_data = token_response.json()
+        id_token = token_data["id_token"]
+
+        # 2️⃣ Vérifier le token JWT Google et extraire les infos
+        
+        google_payload = jwt.decode(id_token, options={"verify_signature": True})
+        email = google_payload["email"]
+        nom = google_payload.get("given_name", "")
+        prenom = google_payload.get("family_name", "")
+
+        # 3️⃣ Chercher ou créer l'utilisateur dans la DB
+        user = db.query(models.User).filter(models.User.email == email).first()
+        if not user:
+            # Création d'un utilisateur Google
+            user = models.User(
+                email=email,
+                nom=nom,
+                prenom=prenom,
+                mot_de_passe="",  # vide car pas de mot de passe local
+                role="user"
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+        # 4️⃣ Créer ton JWT local
+        access_token = auth.create_access_token({"sub": user.email})
+        return {"access_token": access_token, "token_type": "bearer"}
+
+    except Exception as e:
+        print("Erreur login Google:", e)
+        raise HTTPException(status_code=500, detail="Erreur lors de la connexion Google")
+
 
 @app.post("/upload-pdf")
 def upload_pdf(
