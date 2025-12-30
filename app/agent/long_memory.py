@@ -6,14 +6,14 @@ from langgraph.graph import StateGraph, MessagesState, START
 from langgraph.store.postgres import PostgresStore
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from app.connexion_db import getUrl
-
+from app.agent.model import get_llm
 # -------------------------------
 # 1️⃣ Modèle & embeddings
 # -------------------------------
-MODEL_NAME = "mistral"
+#MODEL_NAME = get_llm()
 EMBED_MODEL_NAME = "nomic-embed-text"
 
-llm = ChatOllama(model=MODEL_NAME)
+llm = get_llm()
 embeddings = OllamaEmbeddings(model=EMBED_MODEL_NAME)
 
 # -------------------------------

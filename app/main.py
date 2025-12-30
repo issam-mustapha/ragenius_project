@@ -14,7 +14,10 @@ from app.chat.chatbot import chat_with_agent
 from auth import auth
 import requests
 from jose import jwt
-
+from app.agent.storage_utils import save_user_image ,ocr_image
+from app.agent.context import Context
+from app.agent.tools import extract_text_from_user_image
+from langchain.tools import ToolRuntime
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
@@ -216,3 +219,33 @@ def chat(
     )
 
     return {"answer": answer}
+@app.post("/image")
+async def upload_image(
+    file: UploadFile = File(...),
+    query: str = "",
+    current_user: User = Depends(get_current_user)
+):
+    # 1️⃣ Lire l'image
+    file_bytes = await file.read()
+
+    # 2️⃣ Stocker l'image dans le dossier de l'utilisateur
+    user_dir = os.path.join("storage", "users", f"user_{current_user.id}", "images")
+    os.makedirs(user_dir, exist_ok=True)
+    image_path = os.path.join(user_dir, file.filename)
+    with open(image_path, "wb") as f:
+        f.write(file_bytes)
+
+    # 3️⃣ Extraire le texte via OCR directement
+    image_text = ocr_image(image_path)  # ✅ pas besoin de ToolRuntime
+
+    # 4️⃣ Concaténer texte + query utilisateur
+    combined_query = f"User query: {query}\nText from image: {image_text}"
+
+    # 5️⃣ Envoyer à l'agent
+    #response = chat_with_agent(current_user.id, combined_query)
+
+    return {
+        #"response": response,
+        "image_text": image_text,
+        "image_path": image_path
+    }

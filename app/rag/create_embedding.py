@@ -46,10 +46,14 @@ def create_user_embeddings(user_id: int):
         pages = loader.load()
 
         for page in pages:
-            text = page.page_content.replace("\n", " ").strip()
-            page.page_content = f"This section explains the following concept:\n{text}"
-            page.metadata["source"] = pdf
-            documents.append(page)
+                text = page.page_content.replace("\n", " ").strip()
+                page.page_content = f"This section explains the following concept:\n{text}"
+                page.metadata.update({
+                "source": pdf,
+                "page": page.metadata.get("page", None),  # numéro de page
+                "user_id": user_id
+    })
+                documents.append(page)
 
     print(f"📄 Loaded {len(documents)} pages from {len(new_pdfs)} new PDFs")
 
@@ -68,6 +72,6 @@ def create_user_embeddings(user_id: int):
         db.add_documents(chunks[i:i+batch_size])
         print(f"🧠 Added {i+len(chunks[i:i+batch_size])}/{len(chunks)} chunks")
 
-    db.persist()
+    #db.persist()
     print(f"✅ Vector store updated for user {user_id}")
     return db
