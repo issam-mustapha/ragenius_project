@@ -8,11 +8,15 @@ from app.agent.long_memory import build_long_memory_graph
 agent = build_agent()
 long_memory_graph = build_long_memory_graph()
 
-def chat_with_agent(user_id: int, query: str) -> str:
-    if not query.strip():
-        return "Query is empty."
+def chat_with_agent(user_id: int, query: str | None = None , image_text: str | None = None) -> str:
+    if (not query or not query.strip()) and image_text:
+        query = "Analyze the text extracted from the image and answer accordingly."
 
-    context = Context(user_id=user_id)
+    # 🔹 Si toujours vide → erreur
+    if not query or not query.strip():
+        return "Please provide a question or an image."
+
+    context = Context(user_id=user_id, image_text=image_text)
     messages = [HumanMessage(content=query)]
     config: RunnableConfig = {
         "configurable": {

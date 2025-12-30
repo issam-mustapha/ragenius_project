@@ -31,3 +31,21 @@ def extract_text_from_user_image(runtime: ToolRuntime[Context], file_bytes: byte
     text = ocr_image(image_path)
     return text
 
+@tool
+def answer_based_on_image(runtime: ToolRuntime[Context], file_bytes: bytes, query: str, filename: str = None) -> str:
+    """
+    Stocke l'image, extrait le texte, puis combine avec la query pour l'agent.
+    """
+    user_id = runtime.context.user_id
+
+    # 1️⃣ Stocker l'image
+    image_path = save_user_image(user_id, file_bytes, filename)
+
+    # 2️⃣ Extraire le texte
+    image_text = ocr_image(image_path)
+
+    # 3️⃣ Combiner avec la query
+    combined_query = f"User query: {query}\nText extracted from image: {image_text}"
+
+    return combined_query
+

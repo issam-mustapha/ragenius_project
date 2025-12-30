@@ -13,6 +13,7 @@ from app.rag.get_document_reterived import retrieve_user_documents
 def dynamic_system_prompt(request: ModelRequest) -> str:
     runtime: Runtime[Context] = request.runtime
     user_id = runtime.context.user_id
+    image_text = runtime.context.image_text or "No image provided."
     user_profile = load_profile(store, user_id)
     profile_context = user_profile.model_dump_json(indent=2)
     user_messages = [m for m in request.messages if m.type == "human"]
@@ -29,8 +30,15 @@ def dynamic_system_prompt(request: ModelRequest) -> str:
     ) if docs_with_scores else "No relevant documents found."
 
     return f"""
-You are a highly intelligent RAG conversational assistant.
+You are a highly intelligent assistant.
 
+### 🔴 IMAGE CONTEXT (HIGHEST PRIORITY)
+The following text was extracted from an image uploaded by the user.
+Use it as the PRIMARY source of truth if relevant.
+
+{image_text}
+
+---
 ### Conversation Memory
 {conversation_history}
 

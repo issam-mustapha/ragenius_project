@@ -4,12 +4,12 @@ from app.agent.context import Context
 from app.agent.memory import get_checkpointer, get_summarizer
 from app.agent.prompts import dynamic_system_prompt
 from app.agent.hooks import log_before_model, log_after_model ,long_term_memory_middleware
-from app.agent.tools import fetch_user_email_preferences 
+from app.agent.tools import fetch_user_email_preferences , answer_based_on_image
 
 def build_agent():
     return create_agent(
         model=get_llm(),
-        tools=[fetch_user_email_preferences],
+        tools=[fetch_user_email_preferences ,answer_based_on_image],
         middleware=[
             dynamic_system_prompt,
             get_summarizer(),
