@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-
+from typing import Optional
 class UserCreate(BaseModel):
     nom: str
     prenom: str
@@ -26,3 +26,13 @@ class UserLogin(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+   
+
+class ChatRequest(BaseModel):
+    message: str
+    guest_id: str | None = None  # facultatif si c'est un invité
+
+
+class ChatResponse(BaseModel):
+    reply: str
+

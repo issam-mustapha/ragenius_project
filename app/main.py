@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Depends, HTTPException ,UploadFile, File ,Body,Form
+from fastapi import FastAPI, Depends,Request, HTTPException ,UploadFile, File ,Body,Form
 from sqlalchemy.orm import Session
 from app import connexion_db
 from auth import auth, models, schemas
@@ -7,7 +7,7 @@ from auth.schemas import UserLogin, Token
 from fastapi import HTTPException
 from auth.models import PdfDocument, User
 from pydantic import BaseModel
-from auth.dependencies import get_current_user
+from auth.dependencies import get_current_user , get_current_user_optional
 from app.rag.create_embedding import create_user_embeddings
 from app.rag.get_document_reterived import retrieve_user_documents
 from app.chat.service import chat_with_agent
@@ -19,13 +19,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
-
-
+from app.middleware import guest_user_middleware
+from app.agent.context import Context
+import uuid
 # Crée la DB si pas déjà
 models.Base.metadata.create_all(bind=connexion_db.engine)
 
 app = FastAPI()
-
+app.middleware("http")(guest_user_middleware)
 
 origins = [
     "http://localhost:3000",  # frontend Next.js
@@ -44,6 +45,23 @@ get_db = connexion_db.get_db
 #to recieve query payload
 class QueryRequest(BaseModel):
     query: str
+
+@app.post("/test-chat")
+def chat(payload: QueryRequest, request: Request, db: Session = Depends(get_db)):
+    query_text = payload.query.strip()
+    if not query_text:
+        raise HTTPException(status_code=400, detail="Query manquante")
+
+    # Récupérer user_id généré par le middleware
+    user_id = request.state.user_id
+
+    # Créer le contexte LangChain
+    context = Context(user_id=user_id)
+
+    # Appel à ton agent
+    answer = chat_with_agent(user_id=user_id, query=query_text)
+
+    return {"answer": answer, "user_id": user_id}
 # Endpoint test
 @app.get("/")
 def read_root():
@@ -182,6 +200,28 @@ def login_google(code: str = Form(...), db: Session = Depends(get_db)):
         print("Erreur login Google:", e)
         raise HTTPException(status_code=500, detail="Erreur lors de la connexion Google")
 
+@app.post("/user-non-connected", response_model=schemas.ChatResponse)
+def chat(
+    payload: schemas.ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User | None = Depends(get_current_user_optional)
+):
+    # 🔐 USER CONNECTÉ
+    if current_user:
+        identity = f"user:{current_user.id}"
+
+    # 👤 GUEST
+    elif payload.guest_id:
+        identity = f"guest:{payload.guest_id}"
+
+    else:
+        raise HTTPException(status_code=400, detail="No identity provided")
+
+    # 👉 Ici tu appelles TON agent / LLM
+    # Pour l’instant mock propre
+    reply = f"🤖 (identity={identity}) J'ai bien reçu : {payload.message}"
+
+    return { "reply": reply }
 
 @app.post("/upload-pdf")
 def upload_pdf(
