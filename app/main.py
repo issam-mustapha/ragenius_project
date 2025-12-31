@@ -2,6 +2,7 @@ import os
 from fastapi import FastAPI, Depends,Request, HTTPException ,UploadFile, File ,Body,Form
 from sqlalchemy.orm import Session
 from app import connexion_db
+from typing import Optional
 from auth import auth, models, schemas
 from auth.schemas import UserLogin, Token
 from fastapi import HTTPException
@@ -10,7 +11,7 @@ from pydantic import BaseModel
 from auth.dependencies import get_current_user , get_current_user_optional
 from app.rag.create_embedding import create_user_embeddings
 from app.rag.get_document_reterived import retrieve_user_documents
-from app.chat.service import chat_with_agent
+from app.chat.service import chat_with_agent, get_conversation_with_messages, get_messages_paginated , get_or_create_conversation, get_user_conversations , save_message
 from auth import auth
 import requests
 from jose import jwt
@@ -21,6 +22,8 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from app.middleware import guest_user_middleware
 from app.agent.context import Context
+from auth.schemas import ChatRequest, ChatResponse
+from app.chat import service
 import uuid
 # Crée la DB si pas déjà
 models.Base.metadata.create_all(bind=connexion_db.engine)
@@ -45,23 +48,143 @@ get_db = connexion_db.get_db
 #to recieve query payload
 class QueryRequest(BaseModel):
     query: str
+    conversation_id: Optional[int] = None
+    user_id: Optional[int] = None
 
 @app.post("/test-chat")
-def chat(payload: QueryRequest, request: Request, db: Session = Depends(get_db)):
+def chat(
+    payload: QueryRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
     query_text = payload.query.strip()
+    user_id_vertuelle=payload.user_id
     if not query_text:
         raise HTTPException(status_code=400, detail="Query manquante")
-    
-    # Récupérer user_id généré par le middleware
+
+    user_id = request.state.user_id
+    conversation = None  # important
+
+    is_guest = user_id.startswith("guest-")
+
+    # 🔹 1. Create / get conversation ONLY if user is authenticated
+    if not is_guest:
+        conversation = get_or_create_conversation(
+            db=db,
+            user_id=user_id,
+            conversation_id=payload.conversation_id,
+            first_message=query_text
+        )
+
+        # 🔹 2. Save USER message
+        save_message(
+            db=db,
+            conversation_id=conversation.id,
+            role="user",
+            content=query_text
+        )
+
+    # 🔹 3. Call AI agent (ALWAYS)
+    answer = chat_with_agent(
+        user_id=user_id,
+        query=query_text
+    )
+
+    # 🔹 4. Save ASSISTANT message (only if authenticated)
+    if not is_guest:
+        save_message(
+            db=db,
+            conversation_id=conversation.id,
+            role="assistant",
+            content=answer
+        )
+
+    return {
+        "answer": answer,
+        "conversation_id": conversation.id if conversation else None,
+        "user_id":user_id
+    }
+
+
+@app.get("/conversations")
+def get_conversations(
+    request: Request,
+    db: Session = Depends(get_db)
+):
     user_id = request.state.user_id
 
-    # Créer le contexte LangChain
-    context = Context(user_id=user_id)
+    conversations = get_user_conversations(db, user_id)
 
-    # Appel à ton agent
-    answer = chat_with_agent(user_id=user_id, query=query_text)
+    return [
+        {
+            "id": c.id,
+            "title": c.title,
+            "created_at": c.created_at
+        }
+        for c in conversations
+    ]
 
-    return {"answer": answer, "user_id": user_id}
+@app.get("/conversations/{conversation_id}")
+def get_conversation(
+    conversation_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    user_id = request.state.user_id
+
+    conversation = get_conversation_with_messages(
+        db=db,
+        conversation_id=conversation_id,
+        user_id=user_id
+    )
+
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation introuvable")
+
+    return {
+        "id": conversation.id,
+        "title": conversation.title,
+        "created_at": conversation.created_at,
+        "messages": [
+            {
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "created_at": m.created_at
+            }
+            for m in conversation.messages
+        ]
+    }
+
+@app.get("/conversations/{conversation_id}/messages")
+def get_messages(
+    conversation_id: int,
+    request: Request,
+    limit: int = 20,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    user_id = request.state.user_id
+    
+    messages = get_messages_paginated(
+        db=db,
+        conversation_id=conversation_id,
+        user_id=user_id,
+        limit=limit,
+        offset=offset
+    )
+
+    return [
+        {
+            "id": m.id,
+            "role": m.role,
+            "content": m.content,
+            "created_at": m.created_at
+        }
+        for m in messages
+    ]
+
+
 # Endpoint test
 @app.get("/")
 def read_root():
@@ -139,8 +262,6 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
 
-print("CLIENT_ID:", GOOGLE_CLIENT_ID)
-print("REDIRECT_URI:", GOOGLE_REDIRECT_URI)
 
 @app.post("/login/google", response_model=Token)
 def login_google(code: str = Form(...), db: Session = Depends(get_db)):
@@ -157,8 +278,7 @@ def login_google(code: str = Form(...), db: Session = Depends(get_db)):
             "redirect_uri": GOOGLE_REDIRECT_URI,
             "grant_type": "authorization_code",
         }
-        print("CODE REÇU:", code)
-        print("REDIRECT URI:", GOOGLE_REDIRECT_URI)
+        
 
         token_response = requests.post(token_url, data=data)
         token_response.raise_for_status()
@@ -176,7 +296,7 @@ def login_google(code: str = Form(...), db: Session = Depends(get_db)):
         email = google_payload["email"]
         nom = google_payload.get("given_name", "")
         prenom = google_payload.get("family_name", "")
-        print("email of user is :", email)
+        
         # 3️⃣ Chercher ou créer l'utilisateur dans la DB
         user = db.query(models.User).filter(models.User.email == email).first()
         if not user:
@@ -325,3 +445,4 @@ async def upload_image(
         "response": response,
         "image_text": image_text
     }
+

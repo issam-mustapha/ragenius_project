@@ -6,7 +6,7 @@ print("Dossier courant :", os.getcwd())
 from app.chat.service import chat_with_agent
 def main():
     print("🤖 RAG CHATBOT (CLI)")
-    user_id = 2
+    user_id = "guest-4dee6efc-2838-463c-885b-d678df8c9b2b"
 
     while True:
         user_input = input("\n🧑 User > ")

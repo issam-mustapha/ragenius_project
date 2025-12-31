@@ -1,12 +1,22 @@
+import os
+import sys
 from langchain.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from app.agent.context import Context
 from app.agent.agent_factory import build_agent
 from app.agent.long_memory import build_long_memory_graph
-
+from sqlalchemy.orm import Session
+from typing import Optional
+from datetime import datetime
 # Construire agent et mémoire long terme
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from auth.models import Conversation ,Message
 agent = build_agent()
 long_memory_graph = build_long_memory_graph()
+
+
+
 
 def chat_with_agent(user_id: int, query: str | None = None , image_text: str | None = None) -> str:
     if (not query or not query.strip()) and image_text:
@@ -37,3 +47,109 @@ def chat_with_agent(user_id: int, query: str | None = None , image_text: str | N
 
     ai_messages = [m for m in response["messages"] if m.type == "ai"]
     return ai_messages[-1].content if ai_messages else "No response."
+
+
+
+
+
+
+
+def get_or_create_conversation(
+    db: Session,
+    user_id: str,
+    conversation_id: Optional[int],
+    first_message: str
+) -> Conversation:
+    """
+    Récupère une conversation existante si elle appartient à l'utilisateur,
+    sinon crée une nouvelle conversation.
+    """
+
+    # 🔹 Cas utilisateur authentifié
+    if not user_id.startswith("guest-") and conversation_id:
+        conv = (
+            db.query(Conversation)
+            .filter(
+                Conversation.id == conversation_id,
+                Conversation.user_id == user_id
+            )
+            .first()
+        )
+
+        if conv:
+            return conv
+    # 🔹 Créer une nouvelle conversation
+    title = first_message[:50] if first_message else "Nouvelle conversation"
+
+    conv = Conversation(
+        user_id=user_id,
+        title=title
+    )
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
+    return conv
+
+
+def save_message(
+    db: Session,
+    conversation_id: int,
+    role: str,
+    content: str
+):
+    msg = Message(
+        conversation_id=conversation_id,
+        role=role,
+        content=content
+    )
+    db.add(msg)
+    db.commit()
+
+def get_user_conversations(db: Session, user_id: int):
+    return (
+        db.query(Conversation)
+        .filter(Conversation.user_id == user_id)
+        .order_by(Conversation.created_at.desc())
+        .all()
+    )
+
+
+
+
+
+
+
+def get_conversation_with_messages(
+    db: Session,
+    conversation_id: int,
+    user_id: int
+):
+    return (
+        db.query(Conversation)
+        .filter(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user_id
+        )
+        .first()
+    )
+
+def get_messages_paginated(
+    db: Session,
+    conversation_id: int,
+    user_id: int,
+    limit: int = 20,
+    offset: int = 0
+):
+    return (
+        db.query(Message)
+        .join(Conversation)
+        .filter(
+            Message.conversation_id == conversation_id,
+            Conversation.user_id == user_id
+        )
+        .order_by(Message.created_at.asc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+

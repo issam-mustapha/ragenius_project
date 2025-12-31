@@ -10,14 +10,14 @@ async def guest_user_middleware(request: Request, call_next):
     - Sinon → générer guest user_id unique
     """
     token = request.headers.get("Authorization")
-    print(f"the token we have is:{token}")
+    
     user_id = None
 
     if token:
         # Extraire token "Bearer ..."
         try:
             token_value = token.split(" ")[1]
-            print(f"the token value is :{token_value}")
+            
         except IndexError:
             token_value = token
         user_id = get_user_id_from_token(token_value)

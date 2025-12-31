@@ -1,7 +1,6 @@
 from langchain.tools import tool, ToolRuntime
 from app.agent.context import Context
-import pytesseract
-import cv2
+
 from PIL import Image
 from app.agent.storage_utils import save_user_image, ocr_image  # ou adapte le chemin si utils séparé
 
