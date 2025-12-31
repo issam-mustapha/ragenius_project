@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, Depends,Request, HTTPException ,UploadFile, File ,Body,Form
 from sqlalchemy.orm import Session
 from app import connexion_db
-from typing import Optional
+from typing import Optional, Union
 from auth import auth, models, schemas
 from auth.schemas import UserLogin, Token
 from fastapi import HTTPException
@@ -51,6 +51,11 @@ class QueryRequest(BaseModel):
     conversation_id: Optional[int] = None
     user_id: Optional[int] = None
 
+class QueryRequest(BaseModel):
+    query: str
+    conversation_id: Optional[int] = None
+    user_id: Optional[Union[int, str]] = None
+
 @app.post("/test-chat")
 def chat(
     payload: QueryRequest,
@@ -58,14 +63,15 @@ def chat(
     db: Session = Depends(get_db)
 ):
     query_text = payload.query.strip()
-    user_id_vertuelle=payload.user_id
     if not query_text:
         raise HTTPException(status_code=400, detail="Query manquante")
 
-    user_id = request.state.user_id
-    conversation = None  # important
+    # 🔹 Utiliser user_id fourni dans le payload si présent, sinon request.state.user_id
+    user_id = payload.user_id if payload.user_id is not None else request.state.user_id
+    print(f"the user id is {user_id}")
+    conversation = None
 
-    is_guest = user_id.startswith("guest-")
+    is_guest = isinstance(user_id, str) and user_id.startswith("guest-")
 
     # 🔹 1. Create / get conversation ONLY if user is authenticated
     if not is_guest:
@@ -102,7 +108,7 @@ def chat(
     return {
         "answer": answer,
         "conversation_id": conversation.id if conversation else None,
-        "user_id":user_id
+        "user_id": user_id
     }
 
 

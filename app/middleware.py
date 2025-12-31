@@ -14,7 +14,7 @@ async def guest_user_middleware(request: Request, call_next):
     user_id = None
 
     if token:
-        # Extraire token "Bearer ..."
+        
         try:
             token_value = token.split(" ")[1]
             
@@ -24,7 +24,7 @@ async def guest_user_middleware(request: Request, call_next):
 
 
     if not user_id:
-        # Générer un guest_user_id unique avec préfixe "guest-"
+        
         user_id = f"guest-{uuid.uuid4()}"
 
     request.state.user_id = user_id
@@ -45,7 +45,7 @@ def get_user_id_from_token(token: str) -> str:
         user_id = payload.get("sub")
         if user_id is None:
             raise JWTError("Le token ne contient pas de 'sub'")
-        return str(user_id)  # Retourne toujours une string
+        return str(user_id)  
     except ExpiredSignatureError:
         raise JWTError("Le token a expiré")
     except JWTError as e:

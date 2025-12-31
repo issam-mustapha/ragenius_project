@@ -22,11 +22,11 @@ def extract_text_from_user_image(runtime: ToolRuntime[Context], file_bytes: byte
     """
     user_id = runtime.context.user_id
 
-    # 1️⃣ Stocker l'image dans le dossier utilisateur
+   
  
     image_path = save_user_image(user_id, file_bytes, filename)
 
-    # 2️⃣ Extraire le texte
+   
     text = ocr_image(image_path)
     return text
 
@@ -37,13 +37,13 @@ def answer_based_on_image(runtime: ToolRuntime[Context], file_bytes: bytes, quer
     """
     user_id = runtime.context.user_id
 
-    # 1️⃣ Stocker l'image
+    
     image_path = save_user_image(user_id, file_bytes, filename)
 
-    # 2️⃣ Extraire le texte
+    
     image_text = ocr_image(image_path)
 
-    # 3️⃣ Combiner avec la query
+    
     combined_query = f"User query: {query}\nText extracted from image: {image_text}"
 
     return combined_query

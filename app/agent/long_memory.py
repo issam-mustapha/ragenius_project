@@ -7,26 +7,19 @@ from langgraph.store.postgres import PostgresStore
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from app.connexion_db import getUrl
 from app.agent.model import get_llm
-# -------------------------------
-# 1️⃣ Modèle & embeddings
-# -------------------------------
-#MODEL_NAME = get_llm()
+
 EMBED_MODEL_NAME = "nomic-embed-text"
 
 llm = get_llm()
 embeddings = OllamaEmbeddings(model=EMBED_MODEL_NAME)
 
-# -------------------------------
-# 2️⃣ Store PostgreSQL
-# -------------------------------
+
 DB_URI = getUrl()
 store_cm = PostgresStore.from_conn_string(DB_URI)
 store = store_cm.__enter__()
 store.index = {"embed": embeddings, "dims": 1536}
 
-# -------------------------------
-# 3️⃣ Schéma profil utilisateur
-# -------------------------------
+
 class UserProfile(BaseModel):
     name: Optional[str] = None
     profession: Optional[str] = None
@@ -38,9 +31,7 @@ class UserProfile(BaseModel):
     preferences: Dict[str, str] = {}
     last_update: Optional[datetime] = None
 
-# -------------------------------
-# 4️⃣ Fonctions CRUD
-# -------------------------------
+
 def load_profile(store, user_id: str) -> UserProfile:
     docs = store.search(("users", str(user_id), "profile"))
     if docs:
@@ -78,9 +69,7 @@ def extract_and_validate_json(llm_text: str) -> Optional[UserProfile]:
         logging.error("Extraction or validation failed", exc_info=e)
     return None
 
-# -------------------------------
-# 5️⃣ LangGraph nodes pour mémoire long terme
-# -------------------------------
+
 def update_profile_if_needed(state: MessagesState, *, store, config):
     user_id = config["configurable"]["user_id"]
     user_message = state["messages"][-1].content

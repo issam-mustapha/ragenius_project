@@ -14,11 +14,11 @@ def clean_text(text: str) -> str:
     - Supprime les espaces en trop
     - Supprime les caractères non imprimables
     """
-    # Supprimer les caractères non imprimables
+    
     text = re.sub(r'[^\x20-\x7EàâçéèêëîïôûùüÿñæœÀÂÇÉÈÊËÎÏÔÛÙÜŸÑÆŒ\n]', '', text)
-    # Remplacer les retours à la ligne multiples par un seul espace
+  
     text = re.sub(r'\s+', ' ', text)
-    # Supprimer les espaces en début et fin
+  
     text = text.strip()
     return text
 
@@ -43,7 +43,7 @@ def save_user_image(user_id: int, file_bytes: bytes, filename: str = None) -> st
     user_image_dir = os.path.join(BASE_DIR, "storage", "users", f"user_{user_id}", "images")
     os.makedirs(user_image_dir, exist_ok=True)
 
-    # Nommer le fichier si pas fourni
+   
     if not filename:
         timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
         filename = f"image_{timestamp}.png"

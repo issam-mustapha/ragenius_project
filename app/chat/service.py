@@ -8,7 +8,7 @@ from app.agent.long_memory import build_long_memory_graph
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
-# Construire agent et mémoire long terme
+
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from auth.models import Conversation ,Message

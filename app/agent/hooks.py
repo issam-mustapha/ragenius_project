@@ -10,10 +10,10 @@ def log_before_model(state: AgentState, runtime: Runtime[Context]):
     
 @before_model
 def long_term_memory_middleware(state, runtime: Runtime[Context]):
-    user_id = runtime.context.user_id  # <-- récupération de l'ID utilisateur
+    user_id = runtime.context.user_id  
     if not user_id.startswith("guest-"):
         config = {"configurable": {"user_id": user_id, "thread_id": f"user-{user_id}"}}
-        # Appeler le nœud de mise à jour mémoire
+       
         update_profile_if_needed(state, store=store, config=config)
 
 
