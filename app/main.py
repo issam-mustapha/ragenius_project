@@ -15,17 +15,29 @@ from auth import auth
 import requests
 from jose import jwt
 from app.agent.storage_utils import ocr_image
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
-
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI") 
 
 # Crée la DB si pas déjà
 models.Base.metadata.create_all(bind=connexion_db.engine)
 
 app = FastAPI()
 
+
+origins = [
+    "http://localhost:3000",  # frontend Next.js
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,      # domaines autorisés
+    allow_credentials=True,
+    allow_methods=["*"],        # autorise GET, POST, OPTIONS...
+    allow_headers=["*"],        # autorise tous les headers
+)
 # Dependency
 get_db = connexion_db.get_db
 
@@ -66,6 +78,15 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
         print("Erreur lors de l'ajout de l'utilisateur:", e)
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/me")
+def read_current_user(current_user: models.User = Depends(get_current_user)):
+    return {
+        "first_name": current_user.nom,
+        "last_name": current_user.prenom,
+        "adress": current_user.adress,
+        "email": current_user.email,
+        "role": current_user.role
+    }
 
 @app.post("/login", response_model=Token)
 def login(user: UserLogin, db: Session = Depends(get_db)):
@@ -91,6 +112,18 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         print("Erreur lors de la connexion :", e)
         raise HTTPException(status_code=500, detail="Erreur interne lors de la connexion")
 
+
+
+
+load_dotenv(dotenv_path=".env")  # 👈 IMPORTANT
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
+
+print("CLIENT_ID:", GOOGLE_CLIENT_ID)
+print("REDIRECT_URI:", GOOGLE_REDIRECT_URI)
+
 @app.post("/login/google", response_model=Token)
 def login_google(code: str = Form(...), db: Session = Depends(get_db)):
     """
@@ -106,18 +139,26 @@ def login_google(code: str = Form(...), db: Session = Depends(get_db)):
             "redirect_uri": GOOGLE_REDIRECT_URI,
             "grant_type": "authorization_code",
         }
+        print("CODE REÇU:", code)
+        print("REDIRECT URI:", GOOGLE_REDIRECT_URI)
+
         token_response = requests.post(token_url, data=data)
         token_response.raise_for_status()
         token_data = token_response.json()
-        id_token = token_data["id_token"]
+        google_id_token = token_data["id_token"]
 
         # 2️⃣ Vérifier le token JWT Google et extraire les infos
         
-        google_payload = jwt.decode(id_token, options={"verify_signature": True})
+        google_payload = id_token.verify_oauth2_token(
+            google_id_token,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID
+)
+
         email = google_payload["email"]
         nom = google_payload.get("given_name", "")
         prenom = google_payload.get("family_name", "")
-
+        print("email of user is :", email)
         # 3️⃣ Chercher ou créer l'utilisateur dans la DB
         user = db.query(models.User).filter(models.User.email == email).first()
         if not user:

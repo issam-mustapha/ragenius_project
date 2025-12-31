@@ -3,13 +3,17 @@ from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from typing import Optional
+from fastapi import Depends, HTTPException
+from auth import models
+from sqlalchemy.orm import Session
+from app.connexion_db import get_db
 
 # ==============================
 # Configuration JWT
 # ==============================
-SECRET_KEY = "ksdjffdsjoewr98095fjkfdsjekfdsjfsajofdsjkfdsjpfsakofnvknckjfdsoijds"
+SECRET_KEY = "ksdjffdsjoewr98095fjkfdsjekfdsjfsajofdsj  kfdsjpfsakofnvknckjfdsoijds"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 1440  
+ACCESS_TOKEN_EXPIRE_MINUTES = 14400049
 
 # ==============================
 # Context de hashage
@@ -52,3 +56,4 @@ def decode_access_token(token: str) -> dict:
         return payload
     except JWTError as e:
         raise ValueError(f"Token invalide: {e}")
+
