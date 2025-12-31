@@ -51,7 +51,7 @@ def chat(payload: QueryRequest, request: Request, db: Session = Depends(get_db))
     query_text = payload.query.strip()
     if not query_text:
         raise HTTPException(status_code=400, detail="Query manquante")
-
+    
     # Récupérer user_id généré par le middleware
     user_id = request.state.user_id
 
@@ -119,7 +119,7 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Email ou mot de passe incorrect")
         
         # Création du token
-        token = auth.create_access_token({"sub": db_user.email})
+        token = auth.create_access_token({"sub": str(db_user.id)})
         return {"access_token": token, "token_type": "bearer"}
     
     except HTTPException as e:
