@@ -13,7 +13,7 @@ from app.connexion_db import get_db
 # ==============================
 SECRET_KEY = "ksdjffdsjoewr98095fjkfdsjekfdsjfsajofdsj  kfdsjpfsakofnvknckjfdsoijds"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 14400049
+ACCESS_TOKEN_EXPIRE_MINUTES = 60*24
 
 # ==============================
 # Context de hashage

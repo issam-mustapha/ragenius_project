@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, Depends,Request, HTTPException ,UploadFile, File ,Body,Form
 from sqlalchemy.orm import Session
 from app import connexion_db
-from typing import Optional, Union
+from typing import Optional,Union
 from auth import auth, models, schemas
 from auth.schemas import UserLogin, Token
 from fastapi import HTTPException
@@ -50,6 +50,7 @@ class QueryRequest(BaseModel):
     query: str
     conversation_id: Optional[int] = None
     user_id: Optional[int] = None
+
 
 class QueryRequest(BaseModel):
     query: str
@@ -267,7 +268,7 @@ load_dotenv(dotenv_path=".env")  # 👈 IMPORTANT
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
-
+GOOGLE_REDIRECT_URI_SIGNUP = os.getenv("GOOGLE_REDIRECT_URI_SIGNUP")
 
 @app.post("/login/google", response_model=Token)
 def login_google(code: str = Form(...), db: Session = Depends(get_db)):
@@ -300,8 +301,11 @@ def login_google(code: str = Form(...), db: Session = Depends(get_db)):
 )
 
         email = google_payload["email"]
+        print(f"your email is {email}")
         nom = google_payload.get("given_name", "")
+        print(f"your last name is {nom}")
         prenom = google_payload.get("family_name", "")
+        print(f"your first name is {prenom}")
         
         # 3️⃣ Chercher ou créer l'utilisateur dans la DB
         user = db.query(models.User).filter(models.User.email == email).first()
@@ -319,12 +323,59 @@ def login_google(code: str = Form(...), db: Session = Depends(get_db)):
             db.refresh(user)
 
         # 4️⃣ Créer ton JWT local
-        access_token = auth.create_access_token({"sub": user.email})
+        access_token = auth.create_access_token({"sub": str(user.id)})
+        #token = auth.create_access_token({"sub": str(db_user.id)})
         return {"access_token": access_token, "token_type": "bearer"}
 
     except Exception as e:
         print("Erreur login Google:", e)
         raise HTTPException(status_code=500, detail="Erreur lors de la connexion Google")
+
+
+@app.post("/signup/google", response_model=schemas.UserGoogleOut)
+def signup_google(code: str = Form(...), db: Session = Depends(get_db)):
+    """
+    Recevoir le code d'autorisation Google, récupérer l'utilisateur.
+    Retourner uniquement email, nom et prenom, sans sauvegarder dans la DB.
+    """
+    try:
+        # 1️⃣ Échanger le code contre access_token et id_token
+        token_url = "https://oauth2.googleapis.com/token"
+        data = {
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": GOOGLE_REDIRECT_URI_SIGNUP,
+            "grant_type": "authorization_code",
+        }
+        token_response = requests.post(token_url, data=data)
+        token_response.raise_for_status()
+        token_data = token_response.json()
+        google_id_token = token_data["id_token"]
+
+        # 2️⃣ Vérifier le token Google
+        google_payload = id_token.verify_oauth2_token(
+            google_id_token,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+
+        email = google_payload["email"]
+        nom = google_payload.get("given_name", "")
+        prenom = google_payload.get("family_name", "")
+
+        # 3️⃣ Retourner uniquement les infos
+        return {
+            "email": email,
+            "nom": nom,
+            "prenom": prenom,
+            "role": "user"
+        }
+
+    except Exception as e:
+        print("Erreur signup Google:", e)
+        raise HTTPException(status_code=500, detail="Erreur lors de l'inscription Google")
+    
 
 @app.post("/user-non-connected", response_model=schemas.ChatResponse)
 def chat(

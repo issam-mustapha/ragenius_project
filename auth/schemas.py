@@ -17,6 +17,12 @@ class UserOut(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     mot_de_passe: str
+    
+class UserGoogleOut(BaseModel):
+    email: str
+    nom: str
+    prenom: str
+    role: str
 
 
     model_config = {
