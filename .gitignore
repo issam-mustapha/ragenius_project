@@ -16,3 +16,6 @@ storage/
 # Logs et fichiers temporaires
 *.log
 *.tmp
+
+# files configuration
+.env
