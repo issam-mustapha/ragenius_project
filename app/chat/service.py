@@ -18,7 +18,7 @@ long_memory_graph = build_long_memory_graph()
 
 
 
-def chat_with_agent(user_id: int, query: str | None = None , image_text: str | None = None) -> str:
+def chat_with_agent(user_id: int, query: str | None = None , image_text: str | None = None , pdf_name: str | None = None) -> str:
     if (not query or not query.strip()) and image_text:
         query = "Analyze the text extracted from the image and answer accordingly."
 
@@ -26,7 +26,7 @@ def chat_with_agent(user_id: int, query: str | None = None , image_text: str | N
     if not query or not query.strip():
         return "Please provide a question or an image."
 
-    context = Context(user_id=user_id, image_text=image_text)
+    context = Context(user_id=user_id, image_text=image_text, pdf_name=pdf_name)
     messages = [HumanMessage(content=query)]
     config: RunnableConfig = {
         "configurable": {

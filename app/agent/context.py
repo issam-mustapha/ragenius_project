@@ -4,3 +4,4 @@ from typing import Optional
 class Context:
     user_id: int
     image_text: Optional[str] = None
+    pdf_name: str | None = None 

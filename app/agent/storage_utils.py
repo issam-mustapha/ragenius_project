@@ -22,6 +22,17 @@ def clean_text(text: str) -> str:
     text = text.strip()
     return text
 
+def remove_redundant_phrases(text: str) -> str:
+    # Supprime les phrases répétées consécutivement
+    lines = text.split('. ')
+    seen = set()
+    cleaned_lines = []
+    for line in lines:
+        if line not in seen:
+            cleaned_lines.append(line)
+            seen.add(line)
+    return '. '.join(cleaned_lines)
+
 def ocr_image(image_path: str) -> str:
     try:
         img = cv2.imread(image_path)
@@ -30,8 +41,10 @@ def ocr_image(image_path: str) -> str:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
         text = pytesseract.image_to_string(gray, lang="eng+fra")
+        cleaned_text = clean_text(text)
+        cleaned_text = remove_redundant_phrases(cleaned_text)
         # Nettoyer le texte
-        return clean_text(text)
+        return cleaned_text
     except Exception as e:
         return f"Erreur OCR : {e}"
     

@@ -45,11 +45,6 @@ app.add_middleware(
 # Dependency
 get_db = connexion_db.get_db
 
-#to recieve query payload
-class QueryRequest(BaseModel):
-    query: str
-    conversation_id: Optional[int] = None
-    user_id: Optional[int] = None
 
 
 class QueryRequest(BaseModel):
@@ -58,47 +53,107 @@ class QueryRequest(BaseModel):
     user_id: Optional[Union[int, str]] = None
 
 @app.post("/test-chat")
-def chat(
-    payload: QueryRequest,
+async def chat(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    query: str = Form(...),
+    conversation_id: Optional[int] = Form(None),
+    file: UploadFile | None = File(None)
 ):
-    query_text = payload.query.strip()
-    if not query_text:
-        raise HTTPException(status_code=400, detail="Query manquante")
+    # 🔹 reconstruire le payload
+    payload = QueryRequest(
+        query=query,
+        conversation_id=conversation_id,
+        user_id=None  # sera récupéré depuis token
+    )
+    # 🔹 1. Gestion de la query
+    query_text = payload.query.strip() if payload.query else None
 
-    # 🔹 Utiliser user_id fourni dans le payload si présent, sinon request.state.user_id
+    if not query_text and not file:
+        raise HTTPException(
+            status_code=400,
+            detail="Veuillez fournir une question, une image ou un PDF."
+        )
+
+    # 🔹 2. Récupération du user_id
     user_id = payload.user_id if payload.user_id is not None else request.state.user_id
-    print(f"the user id is {user_id}")
-    conversation = None
+    print(f"[CHAT] user_id = {user_id}")
 
     is_guest = isinstance(user_id, str) and user_id.startswith("guest-")
+    conversation = None
 
-    # 🔹 1. Create / get conversation ONLY if user is authenticated
+    # 🔹 3. Création / récupération conversation (users authentifiés uniquement)
     if not is_guest:
         conversation = get_or_create_conversation(
             db=db,
             user_id=user_id,
             conversation_id=payload.conversation_id,
-            first_message=query_text
+            first_message=query_text or "File input"
         )
 
-        # 🔹 2. Save USER message
-        save_message(
-            db=db,
-            conversation_id=conversation.id,
-            role="user",
-            content=query_text
-        )
+        if query_text:
+            save_message(
+                db=db,
+                conversation_id=conversation.id,
+                role="user",
+                content=query_text
+            )
 
-    # 🔹 3. Call AI agent (ALWAYS)
+    # =========================
+    # 🔹 4. Gestion du fichier
+    # =========================
+    image_text = None
+    pdf_name = None
+
+    if file:
+        filename = file.filename.lower()
+        file_bytes = await file.read()
+
+        # 🔸 PDF
+        if filename.endswith(".pdf") and not is_guest:
+            user_pdf_dir = f"storage/users/user_{user_id}/pdfs"
+            os.makedirs(user_pdf_dir, exist_ok=True)
+
+            file_path = os.path.join(user_pdf_dir, file.filename)
+            with open(file_path, "wb") as f:
+                f.write(file_bytes)
+
+            pdf = PdfDocument(
+                filename=file.filename,
+                filepath=file_path,
+                user_id=user_id
+            )
+            db.add(pdf)
+            db.commit()
+
+            create_user_embeddings(user_id)
+            
+            pdf_name = file.filename
+
+        # 🔸 Image
+        elif filename.endswith((".png", ".jpg", ".jpeg")):
+            user_img_dir = f"storage/users/user_{user_id}/images"
+            os.makedirs(user_img_dir, exist_ok=True)
+
+            image_path = os.path.join(user_img_dir, file.filename)
+            with open(image_path, "wb") as f:
+                f.write(file_bytes)
+
+            image_text = ocr_image(image_path) 
+            print(f"the text of image {image_text}")
+
+    # =========================
+    # 🔹 5. Appel du chatbot (TOUJOURS)
+    # =========================
     answer = chat_with_agent(
         user_id=user_id,
-        query=query_text
+        query=query_text,
+        image_text=image_text,
+        pdf_name=pdf_name
     )
 
-    # 🔹 4. Save ASSISTANT message (only if authenticated)
-    if not is_guest:
+    # 🔹 6. Sauvegarde réponse assistant
+    if not is_guest and conversation:
         save_message(
             db=db,
             conversation_id=conversation.id,

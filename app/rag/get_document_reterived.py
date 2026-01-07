@@ -1,86 +1,88 @@
 import os
-from langchain_chroma import Chroma
+import pickle
+from langchain_community.vectorstores import FAISS
 from langchain_ollama import OllamaEmbeddings
 
 MODEL_NAME = "nomic-embed-text"
 BASE_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..")
 )
-#sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-def get_user_vectorstore(user_id: int):
-    """
-    Retourne le vector store spécifique d'un utilisateur
-    """
-    user_db_dir = os.path.join(
-    BASE_DIR,
-    "storage",
-    "users",
-    f"user_{user_id}",
-    "vectordb"
-)
-   
-    embeddings = OllamaEmbeddings(model=MODEL_NAME)
 
-    # Crée ou charge le vector store
-    db = Chroma(
-        persist_directory=user_db_dir,
-        embedding_function=embeddings
+def get_user_vectorstore(user_id: int):
+    user_db_dir = os.path.join(
+        BASE_DIR,
+        "storage",
+        "users",
+        f"user_{user_id}",
+        "vectordb"
     )
-    return db
+
+    index_faiss = os.path.join(user_db_dir, "index.faiss")
+    index_pkl = os.path.join(user_db_dir, "index.pkl")
+
+    if not os.path.exists(index_faiss):
+        print("❌ FAISS index not found")
+        return None, []
+
+    embeddings = OllamaEmbeddings(model=MODEL_NAME)
+    db = FAISS.load_local(
+        user_db_dir,
+        embeddings,
+        allow_dangerous_deserialization=True
+    )
+
+    return db, db.docstore._dict.values()
+
+
 
 def retrieve_user_documents(
     user_id: int,
     query: str,
     k: int = 5,
     pdf_name: str | None = None,
-    min_score: float = 0.8
+    max_distance: float = 1.5
 ):
-    """
-    Retourne les documents pertinents pour la query de l'utilisateur
-    (avec filtre optionnel par PDF)
-    """
-    db = get_user_vectorstore(user_id)
+    db, _ = get_user_vectorstore(user_id)
+    if not db:
+        return []
 
-    search_kwargs = {"k": k}
+    results = db.similarity_search_with_score(query, k=k)
 
-    # 🔥 FILTRE PAR PDF (IMPORTANT)
-    if pdf_name:
-        search_kwargs["filter"] = {
-            "source": pdf_name
-        }
+    filtered = []
+    for doc, distance in results:
+        if distance > max_distance:
+            continue
 
-    results = db.similarity_search_with_score(
-        query,
-        **search_kwargs
-    )
+        if pdf_name and doc.metadata.get("source") != pdf_name:
+            continue
 
-    # Filtrer selon le score
-    filtered = [(doc, score) for doc, score in results if score >= min_score]
+        filtered.append((doc, distance))
 
     return filtered
 
+
 results = retrieve_user_documents(
-    user_id=2,
-    query="what's machine learning?",
-    #pdf_name="pdfee.pdf"
+    user_id=28,
+    query="who is issam adoch",
+    k=3
 )
-def display_results(results):
-    if not results:
-        print("❌ Aucun document pertinent trouvé.")
-        return
 
-    print("\n📚 Résultats trouvés :\n" + "-" * 40)
+print("Results:", len(results))
 
-    for i, (doc, score) in enumerate(results, start=1):
-        source = doc.metadata.get("source", "unknown")
-        page = doc.metadata.get("page", None)
+for i, (doc, score) in enumerate(results, 1):
+    print(f"\n===== DOCUMENT {i} =====")
+    print(f"Score (distance): {score}")
+    print("Source PDF:", doc.metadata.get("source"))
+    print("Page:", doc.metadata.get("page"))
+    print("User ID:", doc.metadata.get("user_id"))
+    print("\n📄 CONTENU COMPLET :\n")
+    print(doc.page_content)
+    print("\n" + "=" * 80)
 
-        page_display = f"Page {page + 1}" if page is not None else "Page ?"
 
-        print(f"🔹 Résultat {i}")
-        print(f"📄 Document : {source}")
-        print(f"📑 {page_display}")
-        print(f"🎯 Score : {score:.2f}")
-        print(f"📝 Extrait : {doc.page_content[:200]}...")
-        print("-" * 40)
-#display_results(results)
+
+
+db, documents = get_user_vectorstore(user_id=28)
+
+print("📊 FAISS index size:", db.index.ntotal if db else 0)
+print("📄 Stored documents:", len(list(documents)))

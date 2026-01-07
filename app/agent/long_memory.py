@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 from pydantic import BaseModel, ValidationError
 from langgraph.graph import StateGraph, MessagesState, START
 from langgraph.store.postgres import PostgresStore
-from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langchain_ollama import OllamaEmbeddings
 from app.connexion_db import getUrl
 from app.agent.model import get_llm
 
@@ -13,12 +13,10 @@ EMBED_MODEL_NAME = "nomic-embed-text"
 llm = get_llm()
 embeddings = OllamaEmbeddings(model=EMBED_MODEL_NAME)
 
-
 DB_URI = getUrl()
 store_cm = PostgresStore.from_conn_string(DB_URI)
 store = store_cm.__enter__()
 store.index = {"embed": embeddings, "dims": 1536}
-
 
 class UserProfile(BaseModel):
     name: Optional[str] = None
@@ -30,7 +28,6 @@ class UserProfile(BaseModel):
     communication_style: List[str] = []
     preferences: Dict[str, str] = {}
     last_update: Optional[datetime] = None
-
 
 def load_profile(store, user_id: str) -> UserProfile:
     docs = store.search(("users", str(user_id), "profile"))
@@ -68,7 +65,6 @@ def extract_and_validate_json(llm_text: str) -> Optional[UserProfile]:
     except (json.JSONDecodeError, ValidationError) as e:
         logging.error("Extraction or validation failed", exc_info=e)
     return None
-
 
 def update_profile_if_needed(state: MessagesState, *, store, config):
     user_id = config["configurable"]["user_id"]

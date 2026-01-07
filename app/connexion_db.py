@@ -1,8 +1,11 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
 
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/projete_agent_chatbot"
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 #"postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable"
 
 engine = create_engine(DATABASE_URL)

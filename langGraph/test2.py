@@ -15,12 +15,12 @@ class State(TypedDict):
 # Définition des nodes
 # -----------------------
 def node_a(state: State):
-    new_state = {"foo": state["foo"] + 1, "bar": state["bar"] + ["a"]}
+    new_state = {"foo": state["foo"] + 1, "bar": state["bar"] + ["issam"]}
     print("Node A executed:", new_state)
     return new_state
 
 def node_b(state: State):
-    new_state = {"foo": state["foo"] + 1, "bar": state["bar"] + ["b"]}
+    new_state = {"foo": state["foo"] + 1, "bar": state["bar"] + ["adoch"]}
     print("Node B executed:", new_state)
     return new_state
 
@@ -67,7 +67,7 @@ for i, snap in enumerate(history):
 # Mettre à jour l'état
 # -----------------------
 print("\n--- Mise à jour de l'état ---")
-graph.update_state(config, {"foo": 10, "bar": ["update"]})
+graph.update_state(config, {"foo": 10, "bar": ["hello issam adoch"]})
 
 state_snapshot = graph.get_state(config)
 print("État après update :", state_snapshot.values)

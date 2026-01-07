@@ -1,8 +1,10 @@
 import os
+import pickle
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
+from langchain_community.vectorstores import FAISS
+
 
 MODEL_NAME = "nomic-embed-text"
 CHUNK_SIZE = 1000
@@ -14,64 +16,69 @@ def create_user_embeddings(user_id: int):
 
     os.makedirs(user_db_dir, exist_ok=True)
 
-    # Charger DB existante si elle existe
+    index_path = os.path.join(user_db_dir, "faiss.index")
+    store_path = os.path.join(user_db_dir, "docs.pkl")
+
     embeddings = OllamaEmbeddings(model=MODEL_NAME)
-    db = Chroma(persist_directory=user_db_dir, embedding_function=embeddings)
 
-    # Lister tous les PDFs uploadés
+    # 🔹 Charger FAISS existant si présent
+    if os.path.exists(index_path) and os.path.exists(store_path):
+        db = FAISS.load_local(user_db_dir, embeddings, allow_dangerous_deserialization=True)
+        with open(store_path, "rb") as f:
+            existing_docs = pickle.load(f)
+    else:
+        db = None
+        existing_docs = []
+
+    # 🔹 PDFs existants
+    existing_sources = {
+        doc.metadata.get("source") for doc in existing_docs
+        if "source" in doc.metadata
+    }
+
     pdf_files = [f for f in os.listdir(user_pdf_dir) if f.endswith(".pdf")]
-    if not pdf_files:
-        print(f"⚠️ User {user_id} has no PDFs")
-        return None
-
-    # Récupérer les PDFs déjà présents dans la vectordb
-    existing_sources = set()
-    if db._collection:
-        # db._collection.get()["metadatas"] contient les sources
-        metadatas = db._collection.get()["metadatas"]
-        for meta in metadatas:
-            if "source" in meta and meta["source"]:
-                existing_sources.add(meta["source"])
-
-    print(f"les pdfs de cet user est {existing_sources}")
-    # Filtrer les PDF qui n'ont pas encore été traités
     new_pdfs = [pdf for pdf in pdf_files if pdf not in existing_sources]
+
     if not new_pdfs:
-        print(f"✅ No new PDFs to process for user {user_id}")
+        print(f"✅ No new PDFs for user {user_id}")
         return db
-    print(f"my new pdf is {new_pdfs}")
+
     documents = []
     for pdf in new_pdfs:
         loader = PyPDFLoader(os.path.join(user_pdf_dir, pdf))
         pages = loader.load()
 
         for page in pages:
-                text = page.page_content.replace("\n", " ").strip()
-                page.page_content = f"This section explains the following concept:\n{text}"
-                page.metadata.update({
+            text = page.page_content.replace("\n", " ").strip()
+            page.page_content = f"This section explains the following concept:\n{text}"
+            page.metadata.update({
                 "source": pdf,
-                "page": page.metadata.get("page", None),  # numéro de page
+                "page": page.metadata.get("page"),
                 "user_id": user_id
-    })
-                documents.append(page)
+            })
+            documents.append(page)
 
-    print(f"📄 Loaded {len(documents)} pages from {len(new_pdfs)} new PDFs")
+    print(f"📄 Loaded {len(documents)} pages")
 
-    # Split en chunks
-    text_splitter = RecursiveCharacterTextSplitter(
+    splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
-        chunk_overlap=CHUNK_OVERLAP,
-        add_start_index=True
+        chunk_overlap=CHUNK_OVERLAP
     )
-    chunks = text_splitter.split_documents(documents)
-    print(f"✂️ Created {len(chunks)} chunks for new PDFs")
+    chunks = splitter.split_documents(documents)
 
-    # Ajouter seulement les nouveaux chunks
-    batch_size = 50
-    for i in range(0, len(chunks), batch_size):
-        db.add_documents(chunks[i:i+batch_size])
-        print(f"🧠 Added {i+len(chunks[i:i+batch_size])}/{len(chunks)} chunks")
+    print(f"✂️ Created {len(chunks)} chunks")
 
-    #db.persist()
-    print(f"✅ Vector store updated for user {user_id}")
+    if db is None:
+        db = FAISS.from_documents(chunks, embeddings)
+        all_docs = chunks
+    else:
+        db.add_documents(chunks)
+        all_docs = existing_docs + chunks
+
+    # 💾 Sauvegarde
+    db.save_local(user_db_dir)
+    with open(store_path, "wb") as f:
+        pickle.dump(all_docs, f)
+
+    print(f"✅ FAISS vector store updated for user {user_id}")
     return db
