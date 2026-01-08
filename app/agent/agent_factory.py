@@ -10,7 +10,6 @@ from app.agent.hooks import (
     long_term_memory_middleware
 )
 from app.agent.tools import (
-    fetch_user_email_preferences,
     answer_based_on_image
 )
 from app.agent.middleware.pii_ux_mask import PIIMaskUXMiddleware
@@ -70,7 +69,7 @@ def build_agent():
         model=get_llm(),
 
         tools=[
-            fetch_user_email_preferences,
+            
             answer_based_on_image,
         ],
 

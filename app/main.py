@@ -25,6 +25,10 @@ from app.agent.context import Context
 from auth.schemas import ChatRequest, ChatResponse
 from app.chat import service
 import uuid
+from fastapi.responses import FileResponse
+from pdf2image import convert_from_bytes
+import io
+
 # Crée la DB si pas déjà
 models.Base.metadata.create_all(bind=connexion_db.engine)
 
@@ -558,3 +562,37 @@ async def upload_image(
         "image_text": image_text
     }
 
+
+
+
+
+
+
+from pathlib import Path
+
+# Dossier pour stocker les images générées depuis PDF
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+@app.post("/pdf/preview")
+async def pdf_preview(file: UploadFile = File(...)):
+    # Lire le PDF
+    pdf_bytes = await file.read()
+    pages = convert_from_bytes(pdf_bytes, dpi=150)
+    first_page = pages[0]
+
+    # Sauvegarder la première page en PNG
+    filename = f"{UPLOAD_DIR}/{file.filename.replace('.pdf','')}_page1.png"
+    first_page.save(filename, format="PNG")
+
+    # Retourner l'URL de l'image
+    print("le ")
+    return {"url": f"http://127.0.0.1:8000/{filename}"}
+
+# Endpoint pour servir les fichiers statiques du dossier uploads
+@app.get("/uploads/{file_name}")
+async def serve_file(file_name: str):
+    file_path = UPLOAD_DIR / file_name
+    if file_path.exists():
+        return FileResponse(file_path)
+    return {"error": "File not found"}

@@ -4,16 +4,6 @@ from app.agent.context import Context
 from PIL import Image
 from app.agent.storage_utils import save_user_image, ocr_image  # ou adapte le chemin si utils séparé
 
-@tool
-def fetch_user_email_preferences(runtime: ToolRuntime[Context]) -> str:
-    """Fetch user preferences"""
-    user_id = runtime.context.user_id
-
-    if runtime.store:
-        if memory := runtime.store.get(("users",), user_id):
-            return memory.value.get("preferences", "No preferences found")
-
-    return "The user prefers detailed responses."
 
 @tool
 def extract_text_from_user_image(runtime: ToolRuntime[Context], file_bytes: bytes, filename: str = None) -> str:
