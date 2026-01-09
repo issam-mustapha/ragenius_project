@@ -61,28 +61,9 @@ def retrieve_user_documents(
     return filtered
 
 
-results = retrieve_user_documents(
-    user_id=28,
-    query="who is issam adoch",
-    k=3
-)
-
-print("Results:", len(results))
-
-for i, (doc, score) in enumerate(results, 1):
-    print(f"\n===== DOCUMENT {i} =====")
-    print(f"Score (distance): {score}")
-    print("Source PDF:", doc.metadata.get("source"))
-    print("Page:", doc.metadata.get("page"))
-    print("User ID:", doc.metadata.get("user_id"))
-    print("\n📄 CONTENU COMPLET :\n")
-    print(doc.page_content)
-    print("\n" + "=" * 80)
 
 
 
 
-db, documents = get_user_vectorstore(user_id=28)
 
-print("📊 FAISS index size:", db.index.ntotal if db else 0)
-print("📄 Stored documents:", len(list(documents)))
+

@@ -62,15 +62,16 @@ async def chat(
     db: Session = Depends(get_db),
     query: str = Form(...),
     conversation_id: Optional[int] = Form(None),
-    file: UploadFile | None = File(None)
+    file: UploadFile | None = File(None),
+    user_id: Optional[Union[int, str]]= Form(None)
 ):
     # 🔹 reconstruire le payload
     payload = QueryRequest(
         query=query,
         conversation_id=conversation_id,
-        user_id=None  # sera récupéré depuis token
+        user_id=user_id  
     )
-    # 🔹 1. Gestion de la query
+    
     query_text = payload.query.strip() if payload.query else None
 
     if not query_text and not file:
@@ -78,15 +79,15 @@ async def chat(
             status_code=400,
             detail="Veuillez fournir une question, une image ou un PDF."
         )
-
-    # 🔹 2. Récupération du user_id
+    print(f"the user id from front-end is : ${payload.user_id}")
+    
     user_id = payload.user_id if payload.user_id is not None else request.state.user_id
     print(f"[CHAT] user_id = {user_id}")
 
     is_guest = isinstance(user_id, str) and user_id.startswith("guest-")
     conversation = None
 
-    # 🔹 3. Création / récupération conversation (users authentifiés uniquement)
+   
     if not is_guest:
         conversation = get_or_create_conversation(
             db=db,
