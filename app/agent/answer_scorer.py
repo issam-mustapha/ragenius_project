@@ -37,39 +37,61 @@ def is_task_response(runtime) -> bool:
     ctx = runtime.context
     return bool(ctx.pdf_name or ctx.image_text)
 
+def detect_failure_modes(text: str):
+    issues = []
+    text_lower = text.lower()
+    if "i am" in text_lower or "i cannot" in text_lower:
+        issues.append("self_reference_or_refusal")
+    if len(text.split()) < 20:
+        issues.append("under_answer")
+    return issues
+
 # ─────────────────────────────────────────────
-# QUALITY SCORER
+# QUALITY SCORER (INTERNE)
 # ─────────────────────────────────────────────
 @after_model
 def answer_quality_scorer_middleware(state, runtime):
+    """
+    Middleware pour scorer la réponse en interne.
+    ⚠️ Ne modifie jamais la réponse visible par l'utilisateur.
+    """
     messages = state.get("messages", [])
     if not messages:
         return state
 
     response = messages[-1].content or ""
     clean_response = response.strip()
-    lines = [l for l in clean_response.split("\n") if l.strip()]
 
-    # 🟢 CASE 1: low-content / greeting / small talk → ignore
+    # Ignorer les greetings ou petits messages
     if is_low_content_expected(clean_response):
+        state.setdefault("internal_scoring", []).append({
+            "type": "info",
+            "reason": "short_conversation",
+            "length": len(clean_response)
+        })
         return state
 
-    # 🟢 CASE 2: not a task response → ignore
     if not is_task_response(runtime):
+        state.setdefault("internal_scoring", []).append({
+            "type": "info",
+            "reason": "not_task_response"
+        })
         return state
 
-    # 🟡 CASE 3: task response → quality check
+    # Scoring des réponses de tâches
     problems = []
-
     if len(clean_response) < 120:
-        problems.append("too short")
+        problems.append("too_short")
+    if len([l for l in clean_response.split("\n") if l.strip()]) < 4:
+        problems.append("not_structured")
+    issues = detect_failure_modes(clean_response)
 
-    if len(lines) < 4:
-        problems.append("not structured")
-
-    if problems:
-        messages[-1].content += (
-            "\n\n⚠️ The response may be incomplete or insufficiently detailed."
-        )
+    # Stocker les problèmes en interne
+    if problems or issues:
+        state.setdefault("internal_scoring", []).append({
+            "type": "warning",
+            "problems": problems,
+            "issues": issues
+        })
 
     return state

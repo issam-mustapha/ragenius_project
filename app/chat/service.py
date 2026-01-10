@@ -12,8 +12,18 @@ from datetime import datetime
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from auth.models import Conversation ,Message
+
+QUALITY_WARNING = "⚠️ The response may be incomplete or insufficiently detailed."
 agent = build_agent()
 long_memory_graph = build_long_memory_graph()
+
+
+
+
+def clean_ai_response(text: str) -> str:
+    if not text:
+        return text
+    return text.replace(QUALITY_WARNING, "").strip()
 
 
 
