@@ -229,4 +229,5 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ## ⭐ If this project helped you, please give it a star!
 
-*Built with ❤️ using LangChain, LangGraph, FAISS, and Mistral 7B or any LLM you want like GPT claude...*
+*Built with ❤️ using LangChain, LangGraph, FAISS, and a modular LLM backend —  
+works with Mistral 7B (local via Ollama), GPT-4, Claude, Gemini, or any LangChain-compatible model.*
