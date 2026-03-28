@@ -165,8 +165,6 @@ cd ragenius_project
 # 2. Start all services with Docker
 docker-compose up --build
 
-
-
 # Frontend
 cd frontend
 npm install
