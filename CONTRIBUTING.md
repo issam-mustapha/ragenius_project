@@ -34,9 +34,9 @@ By participating in this project, you agree to maintain a respectful and constru
 
 ```bash
 # Fork via GitHub UI, then:
-git clone https://github.com/YOUR_USERNAME/RAGenius.git
+git clone https://github.com/YOUR_USERNAME/ragenius_project.git
 cd RAGenius
-git remote add upstream https://github.com/issam-mustapha/RAGenius.git
+git remote add upstream https://github.com/issam-mustapha/ragenius_project.git
 ```
 
 ### 2. Set Up the Environment
@@ -44,14 +44,12 @@ git remote add upstream https://github.com/issam-mustapha/RAGenius.git
 ```bash
 # Backend (Python)
 cd backend
-python -m venv venv
-source venv/bin/activate       # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+docker-compose up --build
 
 # Frontend (Node.js)
 cd ../frontend
 npm install
+npm run dev
 ```
 
 ### 3. Configure Environment Variables
@@ -67,9 +65,6 @@ cp .env.example .env
 # Start all services
 docker-compose up --build
 
-# Or run individually:
-# Backend
-uvicorn main:app --reload --port 8000
 
 # Frontend
 npm run dev
@@ -208,38 +203,12 @@ When filing a bug report, please include:
 
 Use the issue template provided in `.github/ISSUE_TEMPLATE/`.
 
----
 
-## 📁 Project Structure
-
-```
-RAGenius/
-├── backend/
-│   ├── agents/          # LangGraph agent definitions
-│   ├── memory/          # Short-term & long-term memory logic
-│   ├── rag/             # FAISS indexing, retrieval, embeddings
-│   ├── middleware/       # PII detection, validation
-│   ├── api/             # FastAPI routes & schemas
-│   ├── ocr/             # Image-to-text processing
-│   └── main.py          # App entry point
-├── frontend/
-│   ├── components/      # Reusable React components
-│   ├── pages/           # Next.js pages
-│   ├── styles/          # Tailwind CSS config
-│   └── utils/           # Axios helpers, types
-├── assets/
-│   └── images/          # Screenshots, diagrams
-├── docker-compose.yml
-├── .env.example
-└── README.md
-```
-
----
 
 ## 💬 Questions?
 
-Open a [GitHub Discussion](https://github.com/issam-mustapha/RAGenius/discussions) or reach out via LinkedIn:
-[linkedin.com/in/issamadoch](https://www.linkedin.com/in/issamadoch/)
+Open a [GitHub Discussion](https://github.com/issam-mustapha/ragenius_project/discussions) or reach out via LinkedIn:
+[linkedin.com/in/issamadoch](https://www.linkedin.com/in/issam-ai-engineer)
 
 ---
 
