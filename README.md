@@ -159,18 +159,13 @@ ollama pull mistral
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/issam-mustapha/RAGenius.git
-cd RAGenius
+git clone https://github.com/issam-mustapha/ragenius_project.git
+cd ragenius_project
 
 # 2. Start all services with Docker
 docker-compose up --build
 
-# 3. Or run manually:
 
-# Backend
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload
 
 # Frontend
 cd frontend
