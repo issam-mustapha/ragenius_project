@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: "ragenius_api"
+    static_configs:
+      - targets: ["ragenius:8000"]

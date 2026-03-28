@@ -1,11 +1,50 @@
 version: "3.9"
 
 services:
-  api:
+  ragenius:
     build: .
-    container_name: fastapi_agent
+    image: ragenius:1.0
+    container_name: ragenius-api
     ports:
       - "8000:8000"
+    depends_on:
+      - db
     volumes:
-      - .:/app
+      - .:/app:cached
+    env_file:
+      - .env
+
+  db:
+    image: postgres:15
+    container_name: postgres_db_ragenius
     restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus_ragenius
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana_ragenius
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  postgres_data:
+  grafana_data:

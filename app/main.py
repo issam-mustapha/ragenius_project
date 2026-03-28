@@ -3,16 +3,16 @@ from fastapi import FastAPI, Depends,Request, HTTPException ,UploadFile, File ,B
 from sqlalchemy.orm import Session
 from app import connexion_db
 from typing import Optional,Union
-from auth import auth, models, schemas
-from auth.schemas import UserLogin, Token
+from app.auth import authentication, models, schemas
+from app.auth.schemas import UserLogin, Token
 from fastapi import HTTPException
-from auth.models import PdfDocument, User
+from app.auth.models import PdfDocument, User
 from pydantic import BaseModel
-from auth.dependencies import get_current_user , get_current_user_optional
+from app.auth.dependencies import get_current_user , get_current_user_optional
 from app.rag.create_embedding import create_user_embeddings
 from app.rag.get_document_reterived import retrieve_user_documents
 from app.chat.service import chat_with_agent, get_conversation_with_messages, get_messages_paginated , get_or_create_conversation, get_user_conversations , save_message
-from auth import auth
+from app.auth import authentication
 import requests
 from jose import jwt
 from app.agent.storage_utils import ocr_image
@@ -22,19 +22,20 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from app.middleware import guest_user_middleware
 from app.agent.context import Context
-from auth.schemas import ChatRequest, ChatResponse
+from app.auth.schemas import ChatRequest, ChatResponse
 from app.chat import service
 import uuid
 from fastapi.responses import FileResponse
 from pdf2image import convert_from_bytes
 import io
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # Crée la DB si pas déjà
 models.Base.metadata.create_all(bind=connexion_db.engine)
 
 app = FastAPI()
 app.middleware("http")(guest_user_middleware)
-
+Instrumentator().instrument(app).expose(app)
 origins = [
     "http://localhost:3000",  # frontend Next.js
 ]
@@ -266,7 +267,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Email déjà utilisé")
         
         # Hasher le mot de passe
-        hashed_password = auth.hash_password(user.mot_de_passe)
+        hashed_password = authentication.hash_password(user.mot_de_passe)
         
         db_user = models.User(
             nom=user.nom,
@@ -305,11 +306,11 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Email ou mot de passe incorrect")
         
         # Vérifie le mot de passe
-        if not auth.verify_password(user.mot_de_passe, db_user.mot_de_passe):
+        if not authentication.verify_password(user.mot_de_passe, db_user.mot_de_passe):
             raise HTTPException(status_code=400, detail="Email ou mot de passe incorrect")
         
         # Création du token
-        token = auth.create_access_token({"sub": str(db_user.id)})
+        token = authentication.create_access_token({"sub": str(db_user.id)})
         return {"access_token": token, "token_type": "bearer"}
     
     except HTTPException as e:
@@ -383,7 +384,7 @@ def login_google(code: str = Form(...), db: Session = Depends(get_db)):
             db.refresh(user)
 
         # 4️⃣ Créer ton JWT local
-        access_token = auth.create_access_token({"sub": str(user.id)})
+        access_token = authentication.create_access_token({"sub": str(user.id)})
         #token = auth.create_access_token({"sub": str(db_user.id)})
         return {"access_token": access_token, "token_type": "bearer"}
 
@@ -562,11 +563,6 @@ async def upload_image(
         "response": response,
         "image_text": image_text
     }
-
-
-
-
-
 
 
 from pathlib import Path

@@ -9,9 +9,8 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
 
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from auth.models import Conversation ,Message
+from app.auth.models import Conversation ,Message
 
 QUALITY_WARNING = "⚠️ The response may be incomplete or insufficiently detailed."
 agent = build_agent()

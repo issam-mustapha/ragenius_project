@@ -1,0 +1,21 @@
+{
+  "name": "RAGenius Dev",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "ragenius",
+  "workspaceFolder": "/app",
+  "forwardPorts": [8000],
+  "mounts": [
+    "source=${localEnv:USERPROFILE}\\.ssh,target=/root/.ssh,type=bind"
+  ],
+  "postCreateCommand": "ssh-keyscan github.com >> ~/.ssh/known_hosts",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      }
+    }
+  }
+}

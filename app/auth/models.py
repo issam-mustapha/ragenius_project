@@ -50,3 +50,4 @@ class Message(Base):
 
     # Relation
     conversation = relationship("Conversation", back_populates="messages")
+

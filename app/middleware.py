@@ -1,7 +1,7 @@
 import uuid
 from fastapi import Request
 from jose import jwt, JWTError, ExpiredSignatureError
-from auth.dependencies import SECRET_KEY, ALGORITHM
+from app.auth.dependencies import SECRET_KEY, ALGORITHM
 
 async def guest_user_middleware(request: Request, call_next):
     """

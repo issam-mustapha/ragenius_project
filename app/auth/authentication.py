@@ -4,29 +4,30 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from typing import Optional
 from fastapi import Depends, HTTPException
-from auth import models
+
 from sqlalchemy.orm import Session
 from app.connexion_db import get_db
 
 # ==============================
 # Configuration JWT
 # ==============================
-SECRET_KEY = "ksdjffdsjoewr98095fjkfdsjekfdsjfsajofdsj  kfdsjpfsakofnvknckjfdsoijds"
+SECRET_KEY = "ksdjffdsjoewr98095fjkfdsjekfdsjfsajofdsj_kfdsjpfsakofnvknckjfdsoijds"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60*24
+ACCESS_TOKEN_EXPIRE_MINUTES = 60*24  # 1 jour
 
 # ==============================
-# Context de hashage
+# Context de hashage avec Argon2
 # ==============================
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 # ==============================
 # Fonctions mot de passe
 # ==============================
 def hash_password(password: str) -> str:
-    # tronquer à 72 caractères pour bcrypt
-    return pwd_context.hash(password[:72])
-
+    """
+    Hash le mot de passe avec Argon2
+    """
+    return pwd_context.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
@@ -56,4 +57,3 @@ def decode_access_token(token: str) -> dict:
         return payload
     except JWTError as e:
         raise ValueError(f"Token invalide: {e}")
-
