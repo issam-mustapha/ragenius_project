@@ -209,12 +209,14 @@ OLLAMA_BASE_URL=http://localhost:11434
 ---
 
 ## 📖 Documentation
-
 | Resource | Link |
 |---|---|
 | API Reference | `/docs` (FastAPI auto-docs when running) |
-| Architecture Diagram | `assets/images/work_flow.png` |
 | Full Project Report | `report/RAGenius_Report.pdf` |
+
+## 🗺️ Architecture Diagram
+
+![Architecture Workflow](assets/images/work_flow.png)
 
 ---
 
@@ -222,7 +224,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 **Issam Adoch**
 - 🐙 GitHub: [@issam-mustapha](https://github.com/issam-mustapha)
-- 💼 LinkedIn: [issam-adoch](www.linkedin.com/in/issam-ai-engineer)
+- 💼 LinkedIn: [issam-ai-engineer](https://www.linkedin.com/in/issam-ai-engineer)
 
 ---
 
