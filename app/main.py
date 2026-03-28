@@ -57,7 +57,7 @@ class QueryRequest(BaseModel):
     conversation_id: Optional[int] = None
     user_id: Optional[Union[int, str]] = None
 
-@app.post("/chat")
+@app.post("/test-chat")
 async def chat(
     request: Request,
     db: Session = Depends(get_db),
@@ -66,21 +66,8 @@ async def chat(
     file: UploadFile | None = File(None),
     user_id: Optional[Union[int, str]]= Form(None)
 ):
-    # 🔹 reconstruire le payload
-    payload = QueryRequest(
-        query=query,
-        conversation_id=conversation_id,
-        user_id=user_id  
-    )
+   
     
-    query_text = payload.query.strip() if payload.query else None
-
-    if not query_text and not file:
-        raise HTTPException(
-            status_code=400,
-            detail="Veuillez fournir une question, une image ou un PDF."
-        )
-    print(f"the user id from front-end is : ${payload.user_id}")
     
     user_id = payload.user_id if payload.user_id is not None else request.state.user_id
     print(f"[CHAT] user_id = {user_id}")
@@ -129,12 +116,11 @@ async def chat(
                 filepath=file_path,
                 user_id=user_id
             )
-            db.add(pdf)
-            db.commit()
+           
 
             create_user_embeddings(user_id)
             
-            pdf_name = file.filename
+          
 
         # 🔸 Image
         elif filename.endswith((".png", ".jpg", ".jpeg")):
@@ -162,9 +148,8 @@ async def chat(
     if not is_guest and conversation:
         save_message(
             db=db,
-            conversation_id=conversation.id,
-            role="assistant",
-            content=answer
+            conversation_id=conversation.id
+            
         )
 
     return {
@@ -438,3 +423,157 @@ def signup_google(code: str = Form(...), db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Erreur lors de l'inscription Google")
     
 
+@app.post("/user-non-connected", response_model=schemas.ChatResponse)
+def chat(
+    payload: schemas.ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User | None = Depends(get_current_user_optional)
+):
+    
+        identity = f"user:{current_user.id}"
+
+    # 👤 GUEST
+    elif payload.guest_id:
+        identity = f"guest:{payload.guest_id}"
+
+    else:
+        raise HTTPException(status_code=400, detail="No identity provided")
+
+    # 👉 Ici tu appelles TON agent / LLM
+    # Pour l’instant mock propre
+    reply = f"🤖 (identity={identity}) J'ai bien reçu : {payload.message}"
+
+    return { "reply": reply }
+
+@app.post("/upload-pdf")
+def upload_pdf(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),  # ✅ ici
+    db: Session = Depends(get_db)
+):
+    user_dir = f"storage/users/user_{current_user.id}/pdfs"
+    os.makedirs(user_dir, exist_ok=True)
+
+    file_path = os.path.join(user_dir, file.filename)
+
+    with open(file_path, "wb") as f:
+        f.write(file.file.read())
+
+    pdf = PdfDocument(
+        filename=file.filename,
+        filepath=file_path,
+        user_id=current_user.id
+    )
+    db.add(pdf)
+    db.commit()
+    create_user_embeddings(current_user.id)
+    return {"message": "PDF uploadé avec succès"}
+
+@app.post("/query")
+def query_documents(
+    payload: QueryRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Endpoint pour que l'utilisateur récupère les documents pertinents
+    Payload attendu: {"query": "ma question ici"}
+    """
+    query_text = payload.query
+
+    if not query_text:
+        raise HTTPException(status_code=400, detail="Query manquante")
+
+    # Récupération des documents pertinents
+    docs = retrieve_user_documents(current_user.id, query_text)
+
+    if not docs:
+        return {"message": "Aucun document pertinent trouvé", "results": []}
+
+    # Formater la réponse
+    results = []
+    for doc, score in docs:
+        results.append({
+            "content": doc.page_content,
+            "metadata": doc.metadata,
+            "similarity_score": score
+        })
+
+    return {"results": results}
+
+@app.post("/chat")
+def chat(
+    payload: QueryRequest,
+    current_user: User = Depends(get_current_user)
+):
+    query_text = payload.query.strip()
+
+    if not query_text:
+        raise HTTPException(status_code=400, detail="Query manquante")
+   
+
+    # Générer et stocker automatiquement les préférences de l'utilisateur
+    #initialize_user_preferences(current_user.id, db_session)
+
+    answer = chat_with_agent(
+        user_id=current_user.id,
+        query=query_text
+    )
+
+    return {"answer": answer}
+@app.post("/image")
+async def upload_image(
+    file: UploadFile = File(...),
+    query: str = "",
+    current_user: User = Depends(get_current_user)
+):
+    file_bytes = await file.read()
+
+    user_dir = os.path.join("storage", "users", f"user_{current_user.id}", "images")
+    os.makedirs(user_dir, exist_ok=True)
+
+    image_path = os.path.join(user_dir, file.filename)
+    with open(image_path, "wb") as f:
+        f.write(file_bytes)
+
+    image_text = ocr_image(image_path)
+
+    response = chat_with_agent(
+        user_id=current_user.id,
+        query=query,
+        image_text=image_text
+    )
+
+    return {
+        "response": response,
+        "image_text": image_text
+    }
+
+
+from pathlib import Path
+
+# Dossier pour stocker les images générées depuis PDF
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+@app.post("/pdf/preview")
+async def pdf_preview(file: UploadFile = File(...)):
+    # Lire le PDF
+    pdf_bytes = await file.read()
+    pages = convert_from_bytes(pdf_bytes, dpi=150)
+    first_page = pages[0]
+
+    # Sauvegarder la première page en PNG
+    filename = f"{UPLOAD_DIR}/{file.filename.replace('.pdf','')}_page1.png"
+    first_page.save(filename, format="PNG")
+
+    # Retourner l'URL de l'image
+    print("le ")
+    return {"url": f"http://127.0.0.1:8000/{filename}"}
+
+# Endpoint pour servir les fichiers statiques du dossier uploads
+@app.get("/uploads/{file_name}")
+async def serve_file(file_name: str):
+    file_path = UPLOAD_DIR / file_name
+    if file_path.exists():
+        return FileResponse(file_path)
+    return {"error": "File not found"}
