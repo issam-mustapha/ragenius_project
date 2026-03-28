@@ -222,7 +222,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 **Issam Adoch**
 - 🐙 GitHub: [@issam-mustapha](https://github.com/issam-mustapha)
-- 💼 LinkedIn: [issam-adoch](https://www.linkedin.com/in/issamadoch/)
+- 💼 LinkedIn: [issam-adoch](www.linkedin.com/in/issam-ai-engineer)
 
 ---
 
